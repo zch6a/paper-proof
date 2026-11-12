@@ -86,6 +86,17 @@ def test_one_database_down_still_finds_an_invented_reference():
     assert any(n.startswith("did not answer") for n in v.notes)
 
 
+def test_a_record_with_fewer_authors_is_not_evidence_against_the_citation():
+    from paper_proof.match import Record, compare
+
+    rec = Record(source="x", title="Gradient flow in recurrent nets", authors=["Hochreiter", "Bengio"], year=2001)
+    assert compare("Gradient flow in recurrent nets", ["Hochreiter", "Bengio", "Frasconi", "Schmidhuber"], 2001, rec).problems == []
+    full = Record(source="x", title="Gradient flow in recurrent nets", authors=["Hochreiter", "Bengio", "Frasconi", "Kolen"], year=2001)
+    assert compare("Gradient flow in recurrent nets", ["Hochreiter", "Bengio", "Frasconi", "Schmidhuber"], 2001, full).problems == [
+        "author not on the paper: Schmidhuber"
+    ]
+
+
 @pytest.mark.parametrize("key", sorted(REFS))
 def test_every_request_was_recorded(key):
     # A request the recording does not have would fail loudly: the tests can never reach the network.

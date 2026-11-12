@@ -116,10 +116,33 @@ def _listing(names: list[str]) -> str:
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " or " + names[-1]
 
 
+def shortened(ref: Reference, r: Record) -> bool:
+    """The citation gives only the start of the title ("A decomposable attention model" for "... for natural language
+    inference"). Titles that extend other titles exist ("Attention is all you need in speech separation"), so the
+    first author and the year must agree too.
+
+    >>> rec = Record(source="x", title="A Decomposable Attention Model for Natural Language Inference", authors=["Parikh"], year=2016)
+    >>> shortened(Reference("p", "A decomposable attention model", ["Parikh"], 2016), rec)
+    True
+    >>> shortened(Reference("p", "A decomposable attention model", ["Vaswani"], 2016), rec)
+    False
+    """
+    a, b = norm_text(ref.title).split(), norm_text(r.title).split()
+    if len(a) < 3 or len(b) <= len(a) or b[: len(a)] != a:
+        return False
+    if not ref.authors or not r.authors or ref.year is None or r.year is None:
+        return False
+    from .match import family
+
+    return family(ref.authors[0]) == family(r.authors[0]) and abs(ref.year - r.year) <= 1
+
+
 def _best(ref: Reference, records: list[Record]) -> tuple[Record | None, float]:
     best, score = None, 0.0
     for r in records:
         s = title_similarity(ref.title, r.title)
+        if s < SAME_TITLE and shortened(ref, r):
+            s = SAME_TITLE
         # Between equally similar titles, the one with more of the cited authors.
         bonus = 0.0
         if ref.authors and r.authors:
@@ -224,6 +247,8 @@ def check_reference(ref: Reference, t: Transport) -> Verdict:
     v.match = best
     cmp = compare(ref.title, ref.authors, ref.year, best)
     v.problems.extend(cmp.problems)
+    if ref.title and shortened(ref, best) and title_similarity(ref.title, best.title) < SAME_TITLE:
+        v.notes.append(f'cited with a shortened title; the full title is "{best.title}"')
 
     # 3. Retraction (OpenAlex carries the Retraction Watch data).
     retracted = best.retracted or any(c.retracted and title_similarity(ref.title, c.title) >= SAME_TITLE for c in candidates)

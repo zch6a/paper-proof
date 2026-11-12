@@ -141,7 +141,9 @@ def compare(title: str, cited_authors: list[str], year: int | None, rec: Record)
         if not first:
             problems.append(f"first author is {rec.authors[0]}, not {cited_authors[0]}")
         missing = [n for n in cited_authors if family(n) not in {family(x) for x in rec.authors}]
-        if missing:
+        # A record with fewer authors than the citation is often just incomplete (book chapters, old papers):
+        # then the missing names are not evidence of a wrong citation.
+        if missing and len(rec.authors) >= len(cited_authors):
             problems.append(f"{'author' if len(missing) == 1 else 'authors'} not on the paper: {', '.join(missing[:4])}")
     # One year off is common and fine (an arXiv version, a conference held the year after submission).
     if delta is not None and abs(delta) > 1:
