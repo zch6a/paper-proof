@@ -41,6 +41,7 @@ def _line(text: str, pos: int) -> int:
 class Project:
     main: Path
     files: list[Path] = field(default_factory=list)
+    texts: dict[str, str] = field(default_factory=dict)  # file (relative to the main file's folder) -> text without comments
     cited: dict[str, tuple[str, int]] = field(default_factory=dict)  # key -> where it is first cited
     cite_all: bool = False  # \nocite{*}
     bib_files: list[Path] = field(default_factory=list)
@@ -103,6 +104,7 @@ def read_project(main: Path) -> Project:
         proj.files.append(path)
         text = strip_comments(path.read_text(encoding="utf-8", errors="replace"))
         rel = path.relative_to(root).as_posix()
+        proj.texts[rel] = text
         # Citations and \input in the order they appear, so "first cited at" follows the paper's reading order.
         events = [(m.start(), "cite", m) for m in CITE.finditer(text)]
         events += [(m.start(), "multi", m) for m in MULTICITE.finditer(text)]

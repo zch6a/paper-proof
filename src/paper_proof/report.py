@@ -13,6 +13,10 @@ from dataclasses import asdict, dataclass, field
 
 from . import __version__
 from .check import Verdict
+from .numbers import Finding
+
+FINDING_LABEL = {"error": "ERROR", "warning": "WARNING", "note": "note"}
+FINDING_COLOR = {"error": "31;1", "warning": "33", "note": "2"}
 
 ORDER = ["not-found", "retracted", "mismatch", "unknown", "skipped", "ok"]
 LABEL = {"not-found": "NOT FOUND", "retracted": "RETRACTED", "mismatch": "MISMATCH", "unknown": "UNKNOWN", "skipped": "skipped", "ok": "ok"}
@@ -42,6 +46,8 @@ class Extra:
     undefined: list[tuple[str, str, int]] = field(default_factory=list)  # (key, file, line): \cite with no entry
     uncited: list[str] = field(default_factory=list)
     missing_files: list[str] = field(default_factory=list)
+    findings: list[Finding] = field(default_factory=list)  # the paper against itself (numbers, labels)
+    texts: dict[str, str] = field(default_factory=dict, repr=False)  # the project's sources, never written to a report
 
 
 def _where(v: Verdict) -> str:
@@ -71,6 +77,13 @@ def text(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str,
         out.append(f"{paint('33', 'MISSING'.ljust(9))} {visible(name)} is used by the project but not in it")
     if extra.undefined or extra.missing_files:
         out.append("")
+    if extra.findings:
+        out.append("The paper against itself:")
+        for f in extra.findings:
+            out.append(f"{paint(FINDING_COLOR[f.severity], FINDING_LABEL[f.severity].ljust(9))} {visible(f.file)}:{f.line}  {visible(f.message)}")
+        out.append("")
+    if verdicts:
+        out.append("References:")
     for v in sorted(verdicts, key=lambda v: (ORDER.index(v.status), v.file, v.line)):
         if v.status == "ok" and not v.notes:
             continue
@@ -97,7 +110,9 @@ def text(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str,
     parts = [f"{n} {LABEL[k] if k not in ('ok', 'skipped') else k}" for k, n in s.items() if n]
     if extra.undefined:
         parts.insert(0, f"{len(extra.undefined)} UNDEFINED")
-    out.append("Summary: " + ", ".join(parts) + (f", {len(dups)} duplicate(s)" if dups else ""))
+    fc = Counter(f.severity for f in extra.findings)
+    parts = [f"{fc[k]} {FINDING_LABEL[k]}{'S' if k != 'note' and fc[k] > 1 else ''}" for k in ("error", "warning", "note") if fc[k]] + parts
+    out.append("Summary: " + (", ".join(parts) or "nothing to report") + (f", {len(dups)} duplicate(s)" if dups else ""))
     if s["unknown"]:
         out.append("Unknown means a database did not answer; run again later (answers are cached).")
     return "\n".join(out)
@@ -106,6 +121,8 @@ def text(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str,
 def to_json(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str, extra: Extra | None = None) -> str:
     extra = extra or Extra()
     project = asdict(extra)
+    project.pop("texts")
+    project.pop("findings")
     project["undefined"] = [{"key": k, "file": f, "line": n} for k, f, n in extra.undefined]
     return json.dumps(
         {
@@ -115,6 +132,7 @@ def to_json(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: s
             "summary": summary(verdicts) | {"undefined": len(extra.undefined)},
             "references": [v.to_dict() for v in verdicts],
             "duplicates": [{"first": a, "second": b, "why": why} for a, b, why in dups],
+            "findings": [f.to_dict() for f in extra.findings],
             "project": project if extra.main else None,
         },
         indent=2,
@@ -145,6 +163,9 @@ def markdown(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: 
     out.append(" · ".join(counts))
     if extra.undefined:
         out += [""] + [f"- {_code(chr(92) + 'cite{' + k + '}')} at {_code(f'{f}:{n}')} has no bibliography entry" for k, f, n in extra.undefined]
+    if extra.findings:
+        out += ["", "| | Where | The paper against itself |", "|---|---|---|"]
+        out += [f"| {FINDING_LABEL[f.severity]} | {_code(f'{f.file}:{f.line}')} | {_md(f.message)} |" for f in extra.findings]
     rows = [v for v in sorted(verdicts, key=lambda v: (ORDER.index(v.status), v.line)) if v.status not in ("ok", "skipped") or v.notes]
     if rows:
         out += ["", "| | Reference | What was found |", "|---|---|---|"]

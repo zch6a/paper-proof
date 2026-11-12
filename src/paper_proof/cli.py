@@ -11,7 +11,8 @@ from . import __version__, report
 from .bib import BibError, parse_bib
 from .check import Reference, Verdict, check_reference, duplicates, reference_from_bib
 from .latex import find_main, parse_bbl, read_project
-from .transport import CachedTransport, HttpTransport, Transport, default_cache_dir
+from .numbers import check_numbers
+from .transport import CachedTransport, HttpTransport, ReplayTransport, Transport, default_cache_dir
 
 FAIL_LEVELS = {"not-found": {"not-found", "retracted"}, "mismatch": {"not-found", "retracted", "mismatch"}, "never": set()}
 
@@ -19,8 +20,10 @@ FAIL_LEVELS = {"not-found": {"not-found", "retracted"}, "mismatch": {"not-found"
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="paper-proof",
-        description="Check the references of a paper: each one exists and matches its bibliography entry "
-        "(title, authors, year), is not retracted, and points to the published version when there is one.",
+        description="Check a paper before anyone else does. References: each one exists and matches its bibliography "
+        "entry (title, authors, year), is not retracted, and points to the published version when there is one. "
+        "Numbers (LaTeX): bold results that are not the best, claimed changes that do not add up, abstract numbers found "
+        "nowhere in the paper, references to labels that do not exist.",
     )
     p.add_argument("--version", action="version", version=f"paper-proof {__version__}")
     p.add_argument("bib", metavar="PAPER", help="a LaTeX project folder, its main .tex file, a .bib, or a compiled .bbl")
@@ -30,25 +33,42 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-cache", action="store_true", help="ask the databases again instead of using answers cached on disk")
     p.add_argument("--cache-dir", type=Path, default=None, help=f"where answers are cached (default: {default_cache_dir()})")
     p.add_argument("--only", action="append", default=[], help="check only these entry keys (repeatable)")
+    p.add_argument(
+        "--checks",
+        default="refs,numbers",
+        help="what to check, comma-separated: refs (references, online), numbers (tables, claimed changes, abstract numbers, "
+        "labels: offline, LaTeX only). Default: refs,numbers",
+    )
+    p.add_argument("--offline", action="store_true", help="same as --checks numbers: nothing is sent anywhere")
     return p
 
 
 def run(argv: list[str] | None = None, transport: Transport | None = None) -> int:
     args = build_parser().parse_args(argv)
     path = Path(args.bib)
+    checks = {"numbers"} if args.offline else {c.strip() for c in args.checks.split(",") if c.strip()}
+    if not checks or checks - {"refs", "numbers"}:
+        print(f"paper-proof: --checks takes refs and/or numbers, not {args.checks!r}", file=sys.stderr)
+        return 2
     if args.jobs < 1:
         print("paper-proof: --jobs must be at least 1", file=sys.stderr)
         return 2
     try:
-        refs, extra = load(path)
+        refs, extra = load(path, need_refs="refs" in checks)
     except OSError as e:
         print(f"paper-proof: cannot read {path}: {e.strerror or e}", file=sys.stderr)
         return 2
     except (BibError, InputError) as e:
         print(f"paper-proof: {path}: {e}", file=sys.stderr)
         return 2
+    if "numbers" in checks and extra.texts:
+        extra.findings = check_numbers(extra.texts)
+    if "refs" not in checks:
+        refs, extra.undefined, extra.uncited = [], [], []
     if args.only:
         refs = [r for r in refs if r.key in set(args.only)]
+    if not refs:
+        transport = ReplayTransport({})  # nothing to look up: make sure nothing is
     if transport is None:
         http = HttpTransport()
         transport = http if args.no_cache else CachedTransport(http, args.cache_dir or default_cache_dir())
@@ -69,15 +89,21 @@ def run(argv: list[str] | None = None, transport: Transport | None = None) -> in
         print(report.markdown(verdicts, dups, source, extra))
     else:
         print(report.text(verdicts, dups, source, extra, color=report.use_color()))
-    bad = FAIL_LEVELS[args.fail_on]
-    return 1 if any(v.status in bad for v in verdicts) or (extra.undefined and args.fail_on != "never") else 0
+    return 1 if failed(args.fail_on, verdicts, extra) else 0
+
+
+def failed(level: str, verdicts: list[Verdict], extra: report.Extra) -> bool:
+    if level == "never":
+        return False
+    severities = {"error"} if level == "not-found" else {"error", "warning"}
+    return any(v.status in FAIL_LEVELS[level] for v in verdicts) or bool(extra.undefined) or any(f.severity in severities for f in extra.findings)
 
 
 class InputError(ValueError):
     pass
 
 
-def load(path: Path) -> tuple[list[Reference], report.Extra]:
+def load(path: Path, need_refs: bool = True) -> tuple[list[Reference], report.Extra]:
     """The references to check, from a .bib, a .bbl, a .tex file, or a LaTeX project folder."""
     extra = report.Extra()
     if path.is_dir():
@@ -100,7 +126,8 @@ def load(path: Path) -> tuple[list[Reference], report.Extra]:
         extra.undefined = proj.undefined()
         extra.uncited = [r.key for r in proj.uncited()]
         extra.missing_files = proj.missing_files
-        if not proj.references:
+        extra.texts = proj.texts
+        if not proj.references and need_refs:
             raise InputError(
                 "no bibliography found: no \\bibliography{...} or \\addbibresource{...} with an existing .bib file, "
                 "no thebibliography environment, and no compiled .bbl next to the main file"
