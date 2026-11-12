@@ -43,6 +43,6 @@ jobs:
           python3 - "$REPORT" <<'EOF'
           import json, sys
           kinds = {f["kind"] for f in json.load(open(sys.argv[1]))["findings"]}
-          assert {"bold-not-best", "wrong-change", "abstract-number", "undefined-ref"} <= kinds, kinds
+          assert {"bold-not-best", "wrong-change", "abstract-number", "undefined-ref", "text-vs-table"} <= kinds, kinds
           print("found:", sorted(kinds))
           EOF

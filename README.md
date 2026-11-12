@@ -32,10 +32,11 @@ ERROR     main.tex:23  reference to tab:ablaton, which is never defined: it prin
 WARNING   main.tex:15  the abstract says 29.1, which is not in the text or any table, nor a difference or relative change between two numbers of one table column (an outdated number?)
 WARNING   main.tex:15  the abstract says 1.8, which is not in the text or any table, nor a difference or relative change between two numbers of one table column (an outdated number?)
 WARNING   main.tex:26  from 27.3 to 28.9 is a 5.9% relative change (1.6 points), not 9.5%
-WARNING   main.tex:40  tab:main, BLEU \uparrow: 28.1 is bold but 28.9 (SMA-large (ours)) is higher
+WARNING   main.tex:28  this sentence points to tab:main and says 29.2 (the table has 28.9): a number the table does not show, nor as a difference or relative change of two of its numbers
+WARNING   main.tex:41  tab:main, BLEU \uparrow: 28.1 is bold but 28.9 (SMA-large (ours)) is higher
 note      never referred to in the text: tab:ablation
 
-Summary: 1 ERROR, 4 WARNINGS, 1 note
+Summary: 1 ERROR, 5 WARNINGS, 1 note
 ```
 
 ## It finds these in famous papers
@@ -65,6 +66,7 @@ readers, and the kind a tool can rule out before submission.
 | **Bold that is not best** | a bold number that is the only bold one of its column (within its group of rows) but not the best of it. Which way is better comes from ↑/↓, the metric (BLEU, accuracy, FID, perplexity, error, latency, ...) or the caption ("higher is better"). Tables with models in columns are read by row |
 | **Claimed changes** | "from A to B, a p% improvement" and "an N× speedup": p and N recomputed from A and B, as a relative change or in points, allowing for rounding |
 | **Abstract numbers** | each decimal number in the abstract appears in the text or a table (rounding allowed: 28.43 → 28.4); where the abstract talks about a gain, it may also be a difference or a relative change between two numbers of one table column |
+| **Text against tables** | a sentence that points to a table (`Table~\ref{tab:main}`) and quotes a number: the number is in that table, or a difference or relative change of two of its numbers. Reported only when a cell of the table is within 5% of it (a stale or mistyped result), with that cell |
 | **Labels** | `\ref`, `\cref`, `\autoref`... to labels that are never defined (they print as ??); labels defined twice (an error when something refers to them); figures and tables never referred to |
 | **Citations** | `\cite` keys with no bibliography entry (they print as [?]); entries nobody cites |
 
@@ -93,7 +95,9 @@ Measured with the scripts in [`scripts/`](scripts/) on the 50 papers of [`script
   diagonal bold (the setting tested), bold for the largest value where lower is better, human and oracle rows,
   labels inside macros and `\iftoggle` branches. Now: 7 errors and warnings, 7 real (the table above).
 - **Missed problems.** Errors injected into the same 50 papers (in memory) are found: a correct bold moved to a worse
-  cell, **41 of 42**; a number of the abstract changed to one that is nowhere in the paper, **9 of 11**.
+  cell, **41 of 42**; a number of the abstract changed to one that is nowhere in the paper, **9 of 11**; a number in a
+  sentence that points to a table moved by 0.3, **14 of 18** (the four missed are values like 0.01, where 0.3 is no
+  near neighbour).
 - **References.** On the 264 references of five papers (Transformer, LoRA, DPO, LLaMA, Mistral), the first version
   reported 23 mismatches, nearly all false: later versions cited with a later year, compound and transliterated
   names, arXiv and Zenodo DOIs that Crossref does not hold, consortium authors. After the fixes: 4 mismatches, two of

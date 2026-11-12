@@ -361,6 +361,85 @@ def abstract_numbers(texts: dict[str, str], tables: list[Table]) -> list[Finding
     return out
 
 
+def _table_numbers(t: Table) -> list[tuple[float, int]]:
+    """Every number a table shows, in any cell (spreads and deltas too) or in its caption."""
+    texts = [c.raw for r in t.rows for c in r] + [t.caption]
+    return [(float(x.replace(",", "")), _dec(x.replace(",", ""))) for s in texts for x in NUMBER.findall(s.replace("−", "-"))]
+
+
+def _sentence(text: str, pos: int) -> tuple[int, int]:
+    """The sentence around a position: from the previous sentence end (or blank line) to the next, at most 400
+    characters each way."""
+    lo = max(pos - 400, max(text.rfind(x, 0, pos) for x in (". ", ".\n", "\n\n")) + 1)
+    ends = [x for x in (text.find(". ", pos), text.find(".\n", pos), text.find("\n\n", pos)) if x >= 0]
+    return lo, min([pos + 400] + ends)
+
+
+def table_mentions(texts: dict[str, str], tables: list[Table]) -> list[Finding]:
+    """A sentence that points to a table ("Table~\\ref{tab:main}") and quotes a decimal number: the number is in that
+    table (allowing for rounding), or, where the sentence talks about a gain, a difference or relative change between
+    two numbers of one of its columns."""
+    by_label = {t.label: t for t in tables if t.label}
+    if not by_label:
+        return []
+    all_numbers = [n for t in tables for n in _table_numbers(t)]
+    out = []
+    for file, text in texts.items():
+        seen: set[tuple[int, int]] = set()
+        for key, pos in refs_in(text):
+            if key not in by_label:
+                continue
+            span = _sentence(text, pos)
+            if span in seen:
+                continue
+            seen.add(span)
+            sentence = text[span[0] : span[1]]
+            cited = [by_label[k] for k, _ in refs_in(sentence) if k in by_label]
+            if "\\begin{tabular" in sentence or "\\begin{table" in sentence:
+                continue
+            shown = [n for t in cited for n in _table_numbers(t)]
+            anywhere = all_numbers
+            columns = [col for t in cited for j in range(max((len(r) for r in t.rows), default=0)) if (col := [c for _, c in t.column(j)])]
+            columns += [
+                row for t in cited for i in range(t.header_rows, len(t.rows)) if len(row := [c for c in t.rows[i] if c.value is not None]) > 1
+            ]
+            clean = re.sub(r"\\(?:label|ref|cite\w*|eqref|cref|Cref|autoref|includegraphics)(?:\[[^\]]*\])?\{[^}]*\}", " ", sentence)
+            missing = []
+            for m in re.finditer(r"(?<![\w.\\-])(\d+\.\d+)(?![\w.-])(\s*(?:\\%|%))?", clean):
+                s = m.group(1)
+                x, ex = float(s), _tol(_dec(s))
+                if any(abs(abs(y) - x) <= ex and d >= _dec(s) for y, d in shown):
+                    continue
+                around = clean[max(0, m.start() - 30) : m.end() + 25]
+                unit = "percent" if m.group(2) else "times" if re.match(r"\s*(?:\$?\\times|×|x\b|-fold|times)", clean[m.end() :]) else "plain"
+                if DELTA_CONTEXT.search(around) and _derived(x, ex, columns, unit):
+                    continue
+                if any(abs(abs(y) - x) <= ex and d >= _dec(s) for y, d in anywhere):
+                    continue  # quoted from another table of the paper
+                # A stale or mistyped result sits next to the right one: report only a number with a near neighbour in
+                # the cited table (same precision, within 5%), and name it. A number unlike anything in the table is
+                # most likely about something else (a step time, a setting) and is left alone.
+                near = [y for y, d in shown if d == _dec(s) and y != x and abs(y - x) <= 0.05 * max(abs(x), 1e-9)]
+                if near:
+                    closest = min(near, key=lambda y: abs(y - x))
+                    missing.append((s + ("%" if m.group(2) else ""), f"{closest:.{_dec(s)}f}"))
+            if missing:
+                names = ", ".join(dict.fromkeys(t.label for t in cited))
+                at = span[0] + max(0, sentence.find(missing[0][0].rstrip("%")))
+                said = ", ".join(f"{a} (the table has {b})" for a, b in missing)
+                out.append(
+                    Finding(
+                        "text-vs-table",
+                        "warning",
+                        file,
+                        text.count("\n", 0, at) + 1,
+                        f"this sentence points to {names} and says {said}: a number the table does not show, "
+                        "nor as a difference or relative change of two of its numbers",
+                    )
+                )
+    return out
+
+
 def _derived(x: float, ex: float, columns, unit: str) -> bool:
     """x as a difference (in points), a relative change (only for a percentage) or a ratio (only for "N×") of two
     numbers of one table column. Differences only from columns at least as precise as x: 12 - 10 in a column of
@@ -488,5 +567,6 @@ def check_numbers(texts: dict[str, str]) -> list[Finding]:
         body = re.sub(r"\\begin\{(tabular\*?|tabularx|longtable|equation\*?|align\*?)\}.*?\\end\{\1\}", blank, text, flags=re.S)
         out += change_claims(body, f, lambda pos, text=text: text.count("\n", 0, pos) + 1)
     out += abstract_numbers(texts, tables)
+    out += table_mentions(texts, tables)
     out += labels(texts)
     return sorted(out, key=lambda x: (SEVERITY_ORDER.index(x.severity), x.file, x.line))

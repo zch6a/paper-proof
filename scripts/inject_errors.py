@@ -116,6 +116,39 @@ for d in sorted(p for p in root.iterdir() if p.is_dir()):
             else:
                 misses.append(f"abstract miss {d.name}: {s} -> {new}")
         break
+    # ---- 3. change a number in a sentence that points to a table (the number is in that table) by a little
+    tables = [t for ff, tt in texts.items() for t in find_tables(tt, ff)]
+    by_label = {t.label: t for t in tables if t.label}
+    everything = "\n".join(texts.values())
+    for f, text in texts.items():
+        done = 0
+        for key, pos in N.refs_in(text):
+            if key not in by_label or done >= 3:
+                continue
+            lo, hi = N._sentence(text, pos)
+            nums = {f"{y:.{dd}f}" for y, dd in N._table_numbers(by_label[key]) if dd >= 1}
+            for m in re.finditer(r"(?<![\w.\\-])(\d+\.\d+)(?![\w.-])", text[lo:hi]):
+                s = m.group(1)
+                if s not in nums:
+                    continue
+                dec = len(s.split(".")[1])
+                new = f"{float(s) + 0.3:.{dec}f}"
+                if new in everything:
+                    continue
+                p = lo + m.start(1)
+                mutated = dict(texts)
+                mutated[f] = text[:p] + new + text[p + len(s) :]
+                before = [g for g in N.table_mentions(texts, tables) if g.file == f]
+                after = [g for g in N.table_mentions(mutated, tables) if g.file == f and new in g.message]
+                if before and any(s in g.message for g in before):
+                    continue
+                stats["text-vs-table injected"] += 1
+                if after:
+                    stats["text-vs-table detected"] += 1
+                else:
+                    misses.append(f"text-vs-table miss {d.name} {f}: {s} -> {new} ({key})")
+                done += 1
+                break
 
 print(stats)
 for x in misses[:40]:

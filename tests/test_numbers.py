@@ -130,6 +130,16 @@ def test_abstract_differences_need_the_same_precision_and_unit():
     assert len(msgs) == 1 and "says 1.8," in msgs[0]
 
 
+def test_a_sentence_that_points_to_a_table():
+    from paper_proof.numbers import table_mentions
+
+    good = "Our model reaches 28.9 BLEU, 1.6 above the baseline (Table~\\ref{tab:main}), and trains in 10 hours."
+    stale = "Our model reaches 29.1 BLEU (Table~\\ref{tab:main}), trained for 3.5 days on 8 GPUs."
+    paper = TABLE + "\n" + good + "\n\n" + stale
+    (f,) = table_mentions({"m.tex": paper}, find_tables(paper, "m.tex"))
+    assert "29.1 (the table has 28.9)" in f.message and "3.5" not in f.message  # 3.5 is unlike anything in it
+
+
 def test_a_range_is_not_a_change():
     s = "the relative performance gain ranging from 33\\% to 90\\% and averaging 62\\%."
     assert change_claims(s, "a.tex", lines(s)) == []

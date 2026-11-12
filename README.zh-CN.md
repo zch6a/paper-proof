@@ -29,10 +29,11 @@ ERROR     main.tex:23  reference to tab:ablaton, which is never defined: it prin
 WARNING   main.tex:15  the abstract says 29.1, which is not in the text or any table, nor a difference or relative change between two numbers of one table column (an outdated number?)
 WARNING   main.tex:15  the abstract says 1.8, which is not in the text or any table, nor a difference or relative change between two numbers of one table column (an outdated number?)
 WARNING   main.tex:26  from 27.3 to 28.9 is a 5.9% relative change (1.6 points), not 9.5%
-WARNING   main.tex:40  tab:main, BLEU \uparrow: 28.1 is bold but 28.9 (SMA-large (ours)) is higher
+WARNING   main.tex:28  this sentence points to tab:main and says 29.2 (the table has 28.9): a number the table does not show, nor as a difference or relative change of two of its numbers
+WARNING   main.tex:41  tab:main, BLEU \uparrow: 28.1 is bold but 28.9 (SMA-large (ours)) is higher
 note      never referred to in the text: tab:ablation
 
-Summary: 1 ERROR, 4 WARNINGS, 1 note
+Summary: 1 ERROR, 5 WARNINGS, 1 note
 ```
 
 ## 在著名论文里也能查出问题
@@ -61,6 +62,7 @@ Summary: 1 ERROR, 4 WARNINGS, 1 note
 | **加粗不是最好** | 一列里（同一组行内）唯一加粗的数字却不是这列最好的。哪边更好看 ↑/↓、指标名（BLEU、准确率、FID、困惑度、错误率、延迟……）或表题（“higher is better”）。模型排在列上的表按行检查 |
 | **声称的提升** | “从 A 到 B，提升 p%”和“快 N 倍”：用 A、B 重新算 p 和 N，相对变化和绝对点数都算，允许四舍五入 |
 | **摘要数字** | 摘要里的每个小数都应该出现在正文或表格里（允许四舍五入：28.43 → 28.4）；摘要在说“提升了多少”时，也可以是同一列两个数的差或相对变化 |
+| **正文与表格** | 指向某张表（`Table~\ref{tab:main}`）的句子里写的数字：应在那张表里，或是表中两个数的差或相对变化。只有表里有一个与它相差 5% 以内的数（过时或打错的结果）时才报，并给出那个数 |
 | **标签** | `\ref`、`\cref`、`\autoref` 等指向从未定义的标签（印出来是 ??）；重复定义的标签（有引用时算错误）；从未被提到的图表 |
 | **引用** | `\cite` 了但参考文献里没有的条目（印出来是 [?]）；没被引用的条目 |
 
@@ -85,7 +87,7 @@ Summary: 1 ERROR, 4 WARNINGS, 1 note
 
 - **误报。** 第一版在这些论文上报了 85 条警告，几乎全是误报。逐条对照源码修规则：并列加粗、每类各自加粗、带 Δ 列的两两对比表、
   对角线加粗（标的是测试设置）、越低越好却加粗最大值、人类/oracle 参考行、放在宏和 `\iftoggle` 分支里的标签。现在：7 条错误和警告，7 条属实（上表）。
-- **漏报。** 在同样 50 篇里（内存中）人为注入错误：把正确的加粗挪到更差的格子，**42 处查出 41 处**；把摘要里的数字改成论文里任何地方都没有的值，**11 处查出 9 处**。
+- **漏报。** 在同样 50 篇里（内存中）人为注入错误：把正确的加粗挪到更差的格子，**42 处查出 41 处**；把摘要里的数字改成论文里任何地方都没有的值，**11 处查出 9 处**；把指向表格的句子里的数字改动 0.3，**18 处查出 14 处**（漏的 4 处是 0.01 这类很小的值，改动 0.3 已不算“相近”）。
 - **参考文献。** 在 5 篇论文（Transformer、LoRA、DPO、LLaMA、Mistral）的 264 条参考文献上，第一版报了 23 条“信息不符”，几乎全是误报：
   引用了后来的版本所以年份更晚、复合姓和转写的名字、Crossref 不收录的 arXiv / Zenodo DOI、团体作者。修正后剩 4 条，其中两条是真的错
   （LoRA 把 Jihun Hamm 写成 “Ham”；DPO 引 “Dueling RL” 时第一作者写错）。测试用数据库的真实应答录音驱动（测试从不联网）。
