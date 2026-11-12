@@ -43,6 +43,7 @@ REFERENCE_ROW = re.compile(
     r"test(?: set| data)?$|val(?:idation)?(?: set)?$|real(?: data| images)?$|reference$|random(?: chance| guess)?$|chance$)",
     re.I,
 )
+REFERENCE_ANYWHERE = re.compile(r"\bhumans?\b|\boracle\b|upper[- ]?bound|\bforecast|\bexpert performance", re.I)
 
 
 @dataclass
@@ -73,7 +74,8 @@ class Table:
         ]
 
     def is_reference(self, i: int) -> bool:
-        return bool(REFERENCE_ROW.match(self.row_name(i)))
+        name = self.row_name(i)
+        return bool(REFERENCE_ROW.match(name) or REFERENCE_ANYWHERE.search(name))
 
     def header(self, j: int) -> str:
         return " ".join(r[j].text for r in self.rows[: self.header_rows] if j < len(r)).strip()
@@ -222,32 +224,30 @@ def find_tables(text: str, file: str = "") -> list[Table]:
             end = _matching(around, mm.end(), "{", "}")
             cap = _strip_format(around[mm.end() : end]) if end > 0 else ""
         t = Table(file=file, line=text.count("\n", 0, m.start()) + 1, label=label, caption=cap)
-        group, seen_body, header_done = 0, False, False
+        # Each row gets the number of full-width rules above it (\cmidrule and \cline only underline a span).
+        rules_above, first_rule_row = 0, None
         for row, off in _split(body, "\\\\"):
-            # full-width rules end the header and separate groups of rows; \cmidrule and \cline only underline a span
-            rules = [r for r in RULE.finditer(row) if FULL_RULE.match(r.group(0))]
-            if rules and seen_body:
-                group += 1
+            n_rules = sum(1 for r in RULE.finditer(row) if FULL_RULE.match(r.group(0)))
+            if n_rules and t.rows:
+                rules_above += 1
+                if first_rule_row is None:
+                    first_rule_row = len(t.rows)
             clean = RULE.sub(lambda r: " " * len(r.group(0)), row)
             if not clean.strip():
-                if rules and t.rows and not header_done:
-                    header_done = True
-                    t.header_rows = len(t.rows)
                 continue
-            cells = _cells(clean, i + off, text)
-            if rules and t.rows and not header_done:
-                header_done = True
-                t.header_rows = len(t.rows)
-            t.rows.append(cells)
-            t.groups.append(group)
-            if t.header_rows or header_done:
-                seen_body = True
-        if not header_done:
-            # no rule under a header: the header is the leading rows without numbers
-            t.header_rows = next((k for k, r in enumerate(t.rows) if any(c.value is not None for c in r)), 0)
-        # groups are counted from the body: renumber so the first body group is 0
-        if t.rows:
-            first = t.groups[t.header_rows] if t.header_rows < len(t.groups) else 0
+            t.rows.append(_cells(clean, i + off, text))
+            t.groups.append(rules_above)
+        # The header: the rows above the first rule under content when that rule comes early (headers may hold
+        # numbers: lengths, sizes, shots); when it comes late, the table has no rule under its header, and the
+        # header is the leading rows without numbers.
+        leading = next((k for k, r in enumerate(t.rows) if any(c.value is not None for c in r)), len(t.rows))
+        if first_rule_row is not None and (first_rule_row <= 3 or first_rule_row <= leading):
+            t.header_rows = first_rule_row
+        else:
+            t.header_rows = leading if leading < len(t.rows) else 0
+        # groups counted from the first body row
+        if t.header_rows < len(t.groups):
+            first = t.groups[t.header_rows]
             t.groups = [max(0, g - first) for g in t.groups]
         tables.append(t)
     return tables

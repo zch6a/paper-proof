@@ -52,7 +52,7 @@ def bold_not_best(t: Table) -> list[Finding]:
     """A bold number that is the only bold one in its column (within its group of rows), yet is not the best in its
     column, its group, or its row. Several bold numbers in one column are left alone: authors mark ties, the best of
     each category, or every result above a baseline, and the table cannot tell which."""
-    if OTHER_MEANING.search(t.caption):
+    if re.search(r"\bbold|boldface|highlight|\\textbf\{\s*(?:numbers|results|values)", t.caption, re.I) and OTHER_MEANING.search(t.caption):
         return []
     headers = " ".join(c.text for r in t.rows[: t.header_rows] for c in r)
     if re.search(r"\\Delta|Δ|\bdiff\b|\bgain\b", headers, re.I):
@@ -277,6 +277,11 @@ def change_claims(text: str, file: str, line_of) -> list[Finding]:
 # ---------------------------------------------------------------- abstract numbers
 
 ABSTRACT = re.compile(r"\\begin\{abstract\}(.*?)\\end\{abstract\}", re.S)
+DELTA_CONTEXT = re.compile(
+    r"\bby\b|improv|gain|increas|boost|outperform|better|higher|lower|reduc|decreas|\bover\b|above|ahead|margin|\+|"
+    r"surpass|relative|absolute|points?\b|\bpp\b|faster|speed|fewer|less|more than|times|×|\\times|beat|exceed",
+    re.I,
+)
 
 
 def _abstract(text: str) -> tuple[int, str] | None:
@@ -306,7 +311,8 @@ def abstract_numbers(texts: dict[str, str], tables: list[Table]) -> list[Finding
         return []
     file, text, start, abstract = found
     body = "\n".join(t if f != file else t[:start] + t[start + len(abstract) :] for f, t in texts.items())
-    body_numbers = _numbers_in(re.sub(r"\\(?:label|ref|cite\w*|eqref|cref|autoref)\{[^}]*\}", "", body))
+    body = re.sub(r"\\(?:label|ref|cite\w*|eqref|cref|autoref)\{[^}]*\}", "", body)
+    shown = [(float(x.replace(",", "")), _dec(x.replace(",", ""))) for x in NUMBER.findall(body.replace("−", "-"))]
     columns = []
     for t in tables:
         for j in range(max((len(r) for r in t.rows), default=0)):
@@ -316,10 +322,14 @@ def abstract_numbers(texts: dict[str, str], tables: list[Table]) -> list[Finding
     out = []
     for m in re.finditer(r"(?<![\w.\\-])(\d+\.\d+)(?![\w.-])(\s*(?:\\%|%))?", abstract):
         s = m.group(1)
-        if s in body_numbers or s.rstrip("0").rstrip(".") in body_numbers:
-            continue
         x, ex = float(s), _tol(_dec(s))
-        if _derived(x, ex, columns, percent=bool(m.group(2))):
+        # the same number in the body, or a more precise one that rounds to it (28.43 in a table, 28.4 in the abstract)
+        if any(abs(abs(y) - x) <= ex and d >= _dec(s) for y, d in shown):
+            continue
+        # a difference or a relative change is only expected where the abstract talks about one
+        before = re.split(r"[.;,]\s", abstract[max(0, m.start() - 30) : m.start()])[-1]
+        context = before + " " + re.split(r"[.;,]\s", abstract[m.end() : m.end() + 25])[0]
+        if DELTA_CONTEXT.search(context) and _derived(x, ex, columns, percent=bool(m.group(2))):
             continue
         line = text.count("\n", 0, start + m.start()) + 1
         out.append(

@@ -104,6 +104,18 @@ a & 1.0 & 2.0 & 1.0 \\ b & 3.0 & 4.0 & 1.0 \\ c & 2.0 & 9.0 & \textbf{7.0} \\ \b
     assert t.header_rows == 2 and bold_not_best(t) == []
 
 
+def test_header_without_a_rule_under_it():
+    # LDM's FID table: header, then many result rows, and the first rule only near the end.
+    t = r"""\begin{tabular}{lcc}
+Method & FID $\downarrow$ & Recall $\uparrow$ \\
+A & 15.8 & 0.40 \\ B & 10.2 & 0.46 \\ C & 8.0 & 0.45 \\ D & 7.7 & 0.48 \\ Ours & \textbf{9.1} & \textbf{0.50} \\
+\hline Real data & 0.0 & 1.00 \\ \end{tabular}"""
+    (tab,) = find_tables(t)
+    assert tab.header_rows == 1
+    (f,) = bold_not_best(tab)
+    assert "9.1 is bold but 7.7 (D) is lower" in f.message
+
+
 def test_a_range_is_not_a_change():
     s = "the relative performance gain ranging from 33\\% to 90\\% and averaging 62\\%."
     assert change_claims(s, "a.tex", lines(s)) == []
