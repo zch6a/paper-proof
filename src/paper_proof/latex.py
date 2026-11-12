@@ -7,9 +7,10 @@ Only what is cited is checked; entries nobody cites and \cite keys with no entry
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from . import sources
 from .bib import _matching, parse_bib, plain
@@ -22,6 +23,25 @@ CITE = re.compile(
 MULTICITE = re.compile(r"\\(?:[Cc]ites|[Pp]arencites|[Tt]extcites|[Aa]utocites|[Ff]ootcites)((?:\s*(?:\[[^\]]*\])*\s*\{[^}]*\})+)")
 INPUT = re.compile(r"\\(?:input|include|subfile)\s*\{([^}]+)\}|\\(?:sub)?import\s*\{([^}]*)\}\s*\{([^}]+)\}")
 BIBLIOGRAPHY = re.compile(r"\\bibliography\s*\{([^}]+)\}|\\addbibresource\s*(?:\[[^\]]*\])?\s*\{([^}]+)\}")
+
+
+def read_source(path: Path) -> str:
+    r"""A source file's text: UTF-8 (with or without a BOM), else the Windows and Latin-1 encodings older .tex and
+    .bib files use (so "Müller" stays Müller instead of becoming M�ller and mismatching every record).
+
+    >>> import tempfile, pathlib
+    >>> p = pathlib.Path(tempfile.mkdtemp()) / "x.bib"
+    >>> _ = p.write_bytes("@a{k, author={Müller}}".encode("latin-1"))
+    >>> "Müller" in read_source(p)
+    True
+    """
+    data = path.read_bytes()
+    for encoding in ("utf-8-sig", "cp1252"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("latin-1")
 
 
 def strip_comments(text: str) -> str:
@@ -102,7 +122,7 @@ def find_main(directory: Path) -> Path | None:
         if p.name.startswith(("_region_", "_preview")):  # editor scratch files (AUCTeX previews)
             continue
         try:
-            t = strip_comments(p.read_text(encoding="utf-8", errors="replace"))
+            t = strip_comments(read_source(p))
         except OSError:
             continue
         if "\\documentclass" in t and "\\begin{document}" in t:
@@ -121,10 +141,22 @@ def find_main(directory: Path) -> Path | None:
 def _resolve(root: Path, base: Path, name: str, ext: str) -> Path | None:
     """A file named in the project, looked up relative to the main file's folder; never outside the project."""
     name = name.strip()
+    # Decided on the text alone, before touching the file system: an absolute, drive or UNC name
+    # (\input{//host/share/x} would open a network connection on Windows) or one leading out of the project is
+    # never looked up.
+    pure = PurePath(name.replace("\\", "/"))
+    if not name or pure.anchor or os.path.isabs(name) or name.startswith(("/", "\\", "~")) or re.match(r"^[A-Za-z]:", name):
+        return None
     for folder in (base, root):
-        p = (folder / name).resolve()
+        lexical = os.path.normpath(os.path.join(str(folder), str(pure)))
+        try:
+            if os.path.commonpath([lexical, str(root)]) != str(root):
+                continue
+        except ValueError:  # another drive
+            continue
+        p = Path(lexical).resolve()
         for q in (p, p.with_name(p.name + ext)):
-            if q.is_file() and (q == root or root in q.parents):
+            if (q == root or root in q.parents) and q.is_file():
                 return q
     return None
 
@@ -141,7 +173,7 @@ def read_project(main: Path) -> Project:
             return
         seen.add(path)
         proj.files.append(path)
-        text = strip_dead(strip_comments(path.read_text(encoding="utf-8", errors="replace")))
+        text = strip_dead(strip_comments(read_source(path)))
         rel = path.relative_to(root).as_posix()
         proj.texts[rel] = text
         # Citations and \input in the order they appear, so "first cited at" follows the paper's reading order.
@@ -180,7 +212,7 @@ def read_project(main: Path) -> Project:
     if proj.bib_files:
         proj.bibliography_from = "bib"
         for p in proj.bib_files:
-            for e in parse_bib(p.read_text(encoding="utf-8-sig", errors="replace")):
+            for e in parse_bib(read_source(p)):
                 r = reference_from_bib(e)
                 r.file = p.relative_to(root).as_posix()
                 proj.references.append(r)
@@ -192,7 +224,7 @@ def read_project(main: Path) -> Project:
         bbl = main.with_suffix(".bbl")
         if bbl.is_file():
             proj.bibliography_from = "bbl"
-            proj.references = parse_bbl(bbl.read_text(encoding="utf-8", errors="replace"), bbl.name)
+            proj.references = parse_bbl(read_source(bbl), bbl.name)
     return proj
 
 

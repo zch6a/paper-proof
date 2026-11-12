@@ -44,8 +44,8 @@ runs:
       run: |
         report="$RUNNER_TEMP/paper-proof.json"
         set +e
-        uvx --from "$ACTION_PATH" paper-proof "$PAPER" --checks "$CHECKS" --fail-on never --format md >> "$GITHUB_STEP_SUMMARY"
-        uvx --from "$ACTION_PATH" paper-proof "$PAPER" --checks "$CHECKS" --fail-on "$FAIL_ON" --format json > "$report"
+        uvx --from "$ACTION_PATH" paper-proof --checks "$CHECKS" --fail-on never --format md -- "$PAPER" >> "$GITHUB_STEP_SUMMARY"
+        uvx --from "$ACTION_PATH" paper-proof --checks "$CHECKS" --fail-on "$FAIL_ON" --format json -- "$PAPER" > "$report"
         code=$?
         set -e
         echo "report=$report" >> "$GITHUB_OUTPUT"

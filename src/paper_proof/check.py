@@ -209,8 +209,12 @@ def check_reference(ref: Reference, t: Transport) -> Verdict:
                 r = dataclasses.replace(r, title=ref.title)  # same work: compare the rest
             candidates.append(r)
 
-    # 2. The title, in each database until one has it.
-    best, score = _best(ref, candidates)
+    # 2. The title, in each database until one has it. Without a title, the identifier's record is the work.
+    if not ref.title and candidates:
+        best, score = candidates[0], 1.0
+        v.title = best.title
+    else:
+        best, score = _best(ref, candidates)
     answered: list[str] = []
     if ref.title and score < SAME_TITLE:
         for name, search in TITLE_SEARCHES:

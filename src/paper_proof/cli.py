@@ -11,7 +11,7 @@ from pathlib import Path
 from . import __version__, arxiv_source, report
 from .bib import BibError, parse_bib
 from .check import Reference, Verdict, check_reference, duplicates, reference_from_bib
-from .latex import find_main, parse_bbl, read_project
+from .latex import find_main, parse_bbl, read_project, read_source
 from .numbers import check_numbers
 from .transport import CachedTransport, HttpTransport, ReplayTransport, Transport, TransportError, default_cache_dir
 
@@ -144,7 +144,7 @@ def load(path: Path, need_refs: bool = True) -> tuple[list[Reference], report.Ex
     suffix = path.suffix.lower()
     if suffix == ".bib":
         refs = []
-        for e in parse_bib(path.read_text(encoding="utf-8-sig")):
+        for e in parse_bib(read_source(path)):
             refs.append(reference_from_bib(e))
         return refs, extra
     if suffix == ".pdf":
@@ -155,7 +155,7 @@ def load(path: Path, need_refs: bool = True) -> tuple[list[Reference], report.Ex
             raise InputError("no References section found in this PDF (a scanned PDF has no text to read)")
         return refs, extra
     if suffix == ".bbl":
-        return parse_bbl(path.read_text(encoding="utf-8", errors="replace"), path.name), extra
+        return parse_bbl(read_source(path), path.name), extra
     if suffix == ".tex":
         proj = read_project(path)
         extra.main = proj.main.name

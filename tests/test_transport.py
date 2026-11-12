@@ -91,8 +91,8 @@ def test_the_cache_answers_the_second_time(tmp_path):
 
         def get(self, url):
             Count.n += 1
-            return T.Response(200, "body")
+            return T.Response(200, '{"a": 1}')
 
     c = T.CachedTransport(Count(), tmp_path)
-    assert c.get("https://a/1").text == "body" and c.get("https://a/1").text == "body"
+    assert c.get("https://a/1").json() == {"a": 1} and c.get("https://a/1").json() == {"a": 1}
     assert Count.n == 1

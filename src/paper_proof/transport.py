@@ -4,9 +4,12 @@ answers. The checks only ever see `Transport.get`, so the same code runs online,
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import http.client
 import json
 import os
+import tempfile
 import threading
 import time
 import urllib.error
@@ -121,8 +124,12 @@ class HttpTransport:
                         delay *= 2
                         continue
                     break  # busy or broken: the answer is unknown, never "no such work"
-                return Response(e.code, e.read().decode("utf-8", "replace") if e.fp else "")
-            except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as e:
+                try:
+                    body = e.read().decode("utf-8", "replace") if e.fp else ""
+                except (OSError, http.client.HTTPException):
+                    body = ""
+                return Response(e.code, body)
+            except (urllib.error.URLError, TimeoutError, ConnectionError, OSError, http.client.HTTPException) as e:
                 last_error = str(getattr(e, "reason", e))
                 if attempt < self.retries:
                     time.sleep(delay)
@@ -138,25 +145,63 @@ class CachedTransport:
         self.inner = inner
         self.dir = directory
         self.max_age = max_age_days * 86400
+        self._locks: dict[str, threading.Lock] = {}
+        self._guard = threading.Lock()
 
     def _path(self, url: str) -> Path:
         return self.dir / hashlib.sha256(url.encode()).hexdigest()[:40]
 
-    def get(self, url: str) -> Response:
-        p = self._path(url)
+    def _read(self, p: Path) -> Response | None:
         try:
             if time.time() - p.stat().st_mtime < self.max_age:
                 data = json.loads(p.read_text(encoding="utf-8"))
                 return Response(data["status"], data["text"])
         except (OSError, ValueError, KeyError):
             pass
-        r = self.inner.get(url)
-        if r.status in (200, 404):
-            self.dir.mkdir(parents=True, exist_ok=True)
-            tmp = p.with_suffix(".tmp")
-            tmp.write_text(json.dumps({"url": url, "status": r.status, "text": r.text}), encoding="utf-8")
-            os.replace(tmp, p)
+        return None
+
+    def get(self, url: str) -> Response:
+        p = self._path(url)
+        cached = self._read(p)
+        if cached is not None:
+            return cached
+        # One request per URL at a time: duplicate entries checked in parallel ask once, then read the cache.
+        with self._guard:
+            lock = self._locks.setdefault(url, threading.Lock())
+        with lock:
+            cached = self._read(p)
+            if cached is not None:
+                return cached
+            r = self.inner.get(url)
+            if r.status == 404 or (r.status == 200 and _is_answer(r.text)):
+                self._write(p, url, r)
         return r
+
+    def _write(self, p: Path, url: str, r: Response) -> None:
+        """Best effort: a cache that cannot be written (read-only disk, a file held open on Windows) never stops a check."""
+        tmp = None
+        try:
+            self.dir.mkdir(parents=True, exist_ok=True)
+            fd, tmp = tempfile.mkstemp(dir=self.dir, prefix=p.name, suffix=".tmp")
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump({"url": url, "status": r.status, "text": r.text}, f)
+            os.replace(tmp, p)
+        except OSError:
+            if tmp:
+                with contextlib.suppress(OSError):
+                    os.unlink(tmp)
+
+
+def _is_answer(text: str) -> bool:
+    """A body worth keeping: JSON or XML (the databases' formats), not an HTML error or bot-check page."""
+    head = text.lstrip()[:200].lower()
+    if head.startswith(("{", "[")):
+        try:
+            json.loads(text)
+            return True
+        except ValueError:
+            return False
+    return head.startswith("<?xml") or head.startswith("<feed")
 
 
 class ReplayTransport:

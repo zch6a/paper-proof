@@ -202,7 +202,9 @@ def _better(v: float, col, want: str):
 # ---------------------------------------------------------------- "from A to B, p%"
 
 _NUM = r"(\d+(?:\.\d+)?)"
-FROM_TO = re.compile(r"\bfrom\s+\$?" + _NUM + r"\s*\$?\s*(?:\\?%|points?|pp)?\s+to\s+\$?" + _NUM + r"\s*\$?\s*(?:\\?%|points?|pp)?", re.I)
+# No two whitespace quantifiers can match the same spaces (a long run of blanks must not cost quadratic time).
+_UNIT = r"(?:\s*\$)?(?:\s*(?:\\?%|points?\b|pp\b))?"
+FROM_TO = re.compile(r"\bfrom\s+\$?" + _NUM + _UNIT + r"\s+to\s+\$?" + _NUM + _UNIT, re.I)
 PERCENT = re.compile(r"(?<![\d.])" + _NUM + r"\s*(?:\\%|%|percent\b)")
 POINTS = re.compile(r"(?<![\d.])" + _NUM + r"\s*(?:points?|pp|p\.p\.|absolute)\b", re.I)
 TIMES = re.compile(r"(?<![\d.])" + _NUM + r"\s*\$?\s*(?:\\times|×|x\b|-fold|times)", re.I)

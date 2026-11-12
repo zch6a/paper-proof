@@ -9,6 +9,7 @@ import gzip
 import io
 import re
 import tarfile
+import zlib
 from pathlib import Path
 
 from .transport import USER_AGENT, TransportError
@@ -51,16 +52,30 @@ def fetch(arxiv_id: str, into: Path, timeout: float = 60.0) -> Path:
     return into
 
 
+MAX_UNPACKED = 500 * 1024 * 1024  # all source files together, once decompressed: a bomb stops here
+
+
+def _copy(src, target: Path, budget: list[int]) -> None:
+    with open(target, "wb") as out:
+        while chunk := src.read(1 << 20):
+            budget[0] -= len(chunk)
+            if budget[0] < 0:
+                raise ValueError(f"the source unpacks to more than {MAX_UNPACKED // 2**20} MB: not extracted")
+            out.write(chunk)
+
+
 def extract(data: bytes, into: Path) -> list[Path]:
-    """The source files of an arXiv e-print (a gzipped tar, or a single gzipped .tex) written under `into`."""
+    """The source files of an arXiv e-print (a gzipped tar, or a single gzipped .tex) written under `into`. A
+    truncated or corrupt archive, or one that unpacks to more than MAX_UNPACKED, is a ValueError."""
     into.mkdir(parents=True, exist_ok=True)
     root = into.resolve()
-    written = []
+    written: list[Path] = []
+    budget = [MAX_UNPACKED]
     try:
         with tarfile.open(fileobj=io.BytesIO(data)) as tf:
-            for m in tf.getmembers():
+            for m in tf:
                 name = Path(m.name)
-                if not m.isfile() or name.is_absolute() or ".." in name.parts or name.suffix.lower() not in KEEP:
+                if not m.isfile() or name.is_absolute() or name.anchor or ".." in name.parts or name.suffix.lower() not in KEEP:
                     continue
                 target = (into / name).resolve()
                 if root not in target.parents:
@@ -68,11 +83,17 @@ def extract(data: bytes, into: Path) -> list[Path]:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 f = tf.extractfile(m)
                 if f is not None:
-                    target.write_bytes(f.read())
+                    _copy(f, target, budget)
                     written.append(target)
+        return written
     except tarfile.ReadError:
-        text = gzip.decompress(data) if data[:2] == b"\x1f\x8b" else data
-        target = into / "main.tex"
-        target.write_bytes(text)
-        written.append(target)
-    return written
+        pass  # not a tar: a single (gzipped) file
+    except (tarfile.TarError, EOFError, OSError, zlib.error) as e:
+        raise ValueError(f"the source archive is damaged ({e.__class__.__name__}): not extracted") from e
+    target = into / "main.tex"
+    try:
+        src = gzip.GzipFile(fileobj=io.BytesIO(data)) if data[:2] == b"\x1f\x8b" else io.BytesIO(data)
+        _copy(src, target, budget)
+    except (EOFError, OSError, zlib.error) as e:
+        raise ValueError(f"the source archive is damaged ({e.__class__.__name__}): not extracted") from e
+    return [target]

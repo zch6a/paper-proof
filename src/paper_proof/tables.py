@@ -18,6 +18,7 @@ RULE = re.compile(
     r"\\(?:toprule|midrule|bottomrule|hline|specialrule|cmidrule|cline|hdashline|addlinespace|endhead|endfirsthead|endfoot|endlastfoot)\b"
     r"(?:\s*\([^)]*\))?(?:\s*\{[^}]*\})*(?:\s*\[[^\]]*\])?"
 )
+MAX_SPAN = 64  # \multicolumn{3000000}{c}{x} must not allocate millions of cells
 FULL_RULE = re.compile(r"\\(?:toprule|midrule|bottomrule|hline|specialrule|hdashline)\b")
 NUMBER = re.compile(r"(?<![\w.])[-−]?\d+(?:,\d{3})*(?:\.\d+)?(?![\w.])")
 BOLD = re.compile(r"\\(?:textbf|mathbf|boldsymbol|bm|pmb)\s*\{|\{\s*\\bf(?:series)?\b|\\bf(?:series)?\b|\\cellcolor\{best\}")
@@ -183,7 +184,7 @@ def _cells(row: str, offset: int, text: str) -> list[Cell]:
         span = 1
         m = re.match(r"\s*\\multicolumn\s*\{(\d+)\}\s*\{[^}]*\}\s*\{", raw)
         if m:
-            span = int(m.group(1))
+            span = min(int(m.group(1)), MAX_SPAN)
             end = _matching(raw, m.end(), "{", "}")
             raw = raw[m.end() : end if end > 0 else len(raw)]
         m = re.match(r"\s*\\multirow\s*(?:\[[^\]]*\])?\s*\{[^}]*\}\s*(?:\[[^\]]*\])?\s*\{[^}]*\}\s*(?:\[[^\]]*\])?\s*\{", raw)

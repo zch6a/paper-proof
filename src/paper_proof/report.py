@@ -149,9 +149,17 @@ def to_json(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: s
 
 
 def _md(s: str) -> str:
-    """Text in a Markdown table cell: nothing in it renders (links, images, HTML, mentions)."""
+    """Text in a Markdown table cell: nothing in it renders (links, autolinked URLs, images, HTML, mentions).
+
+    >>> out = _md("see https://evil.example and www.evil.example [x](y) @someone")
+    >>> "://" in out, "www." in out, "[x](y)" in out, "@someone" in out
+    (False, False, False, False)
+    """
     s = visible(s).replace("\n", " ").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    s = re.sub(r"([\\`*_{}\[\]()#+!|~])", r"\\\1", s)
+    # brackets (links, images), code, emphasis, the table's pipe; parentheses render nothing without brackets
+    s = re.sub(r"([\\`*_\[\]|~])", r"\\\1", s)
+    # GitHub links bare URLs and www. addresses by itself: a zero-width space breaks the pattern, not the text
+    s = s.replace("://", ":​//").replace("www.", "www​.")
     return s.replace("@", "@​")
 
 
