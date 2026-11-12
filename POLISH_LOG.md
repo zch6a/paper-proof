@@ -35,3 +35,8 @@
 - **CI**：Python 3.10 上 3 个 doctest 失败（示例写在文档字符串第一行，3.13 才会自动去缩进），已改；本地也用 3.10 跑一遍。
 - **体验**：`--fail-on` 的帮助文字和实际行为对齐；README 补上 arXiv 号与 PDF 两种输入。
 - 测试 96 个（录音重录，新增 arXiv DOI、Zenodo DOI、引用年份更晚三种情况）。代码审查子任务因额度用尽中断，额度恢复后继续。
+
+## 第 2 轮打磨（2026-11-13，进行中）
+
+- 社交预览图 docs/social-preview.png（scripts/social-card.html，无头 Chrome 渲染），终端内容是示例论文的真实输出（缩短）。
+  示例论文里 Houlsby 的年份改成 2016：差一年在容忍范围内不报，原来写的 2018 演示不出“信息不符”。需要在仓库 Settings → Social preview 上传。
