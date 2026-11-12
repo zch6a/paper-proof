@@ -58,6 +58,10 @@ class HttpTransport:
         self.openalex_key = os.environ.get("OPENALEX_API_KEY", "")
         self._last: dict[str, float] = {}
         self._lock = threading.Lock()
+        # A host that failed this many times in a row is left alone for the rest of the run (Semantic Scholar
+        # without a key often answers 429 for minutes): its references become "unknown" quickly, not slowly.
+        self.max_failures = 3
+        self._failures: dict[str, int] = {}
 
     def _pace(self, host: str) -> None:
         # Reserve this request's slot under the lock, wait outside it: a pause for arXiv must not hold up OpenAlex.
@@ -70,6 +74,19 @@ class HttpTransport:
 
     def get(self, url: str) -> Response:
         host = urlsplit(url).hostname or ""
+        if self._failures.get(host, 0) >= self.max_failures:
+            raise TransportError(f"{host}: not asked again after {self.max_failures} failures in a row")
+        try:
+            r = self._get(url, host)
+        except TransportError:
+            with self._lock:
+                self._failures[host] = self._failures.get(host, 0) + 1
+            raise
+        with self._lock:
+            self._failures[host] = 0
+        return r
+
+    def _get(self, url: str, host: str) -> Response:
         if self.mailto and host == "api.crossref.org":
             url += ("&" if "?" in url else "?") + "mailto=" + urllib.request.quote(self.mailto)
         # OpenAlex answers without a key, within a small daily budget; a free key (set by the user) raises it tenfold.
@@ -95,12 +112,14 @@ class HttpTransport:
             except urllib.error.HTTPError as e:
                 if e.code == 404:
                     return Response(404, "")
-                if e.code in (429, 500, 502, 503, 504) and attempt < self.retries:
-                    retry_after = e.headers.get("Retry-After", "") if e.headers else ""
-                    time.sleep(float(retry_after) if retry_after.isdigit() else delay)
-                    delay *= 2
+                if e.code in (429, 500, 502, 503, 504):
                     last_error = f"HTTP {e.code}"
-                    continue
+                    if attempt < self.retries:
+                        retry_after = e.headers.get("Retry-After", "") if e.headers else ""
+                        time.sleep(min(float(retry_after), 60.0) if retry_after.isdigit() else delay)
+                        delay *= 2
+                        continue
+                    break  # busy or broken: the answer is unknown, never "no such work"
                 return Response(e.code, e.read().decode("utf-8", "replace") if e.fp else "")
             except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as e:
                 last_error = str(getattr(e, "reason", e))
