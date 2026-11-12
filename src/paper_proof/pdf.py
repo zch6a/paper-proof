@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 
 from .check import Reference, clean_doi
-from .latex import DOI, YEAR, family_names
+from .latex import DOI, YEAR, clean_title, family_names
 
 HEADING = re.compile(r"^\s*(?:\d+\.?\s*|[IVX]+\.\s*)?(?:references|bibliography|literature cited|works cited|reference list)\s*$", re.I | re.M)
 # Where the references end: an appendix or a checklist heading on a line of its own.
@@ -117,7 +117,7 @@ def reference_from_string(key: str, s: str, number: int = 0) -> Reference:
             elif segs:
                 authors_part = segs[0]
     title = re.sub(r"^\s*In\s*:?\s+.*", "", title)  # "In Proceedings ..." is a venue, not a title
-    title = re.sub(r"[.,;:\s]+$", "", title).strip()
+    title = clean_title(title).strip()
     years = YEAR.findall(authors_part) or YEAR.findall(s)
     year = int(years[0] if YEAR.findall(authors_part) else years[-1]) if years else None
     preprint = bool(arx) and bool(re.search(r"arXiv|CoRR", venue, re.I)) and not re.search(r"\bIn\b", venue)

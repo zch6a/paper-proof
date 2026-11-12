@@ -249,7 +249,7 @@ def _bibitem(key: str, body: str, line: int, filename: str) -> Reference:
         venue = " ".join(blocks[2:])
     else:
         title, author_part, venue = "", blocks[0] if blocks else "", ""
-    title = re.sub(r"[.,;:\s]+$", "", title)
+    title = clean_title(title)
     years = YEAR.findall(author_part) or YEAR.findall(plain(raw))
     year = int(years[0] if YEAR.findall(author_part) else years[-1]) if years else None
     families = family_names(author_part)
@@ -268,6 +268,32 @@ def _bibitem(key: str, body: str, line: int, filename: str) -> Reference:
         cited_as_preprint=preprint,
         file=filename,
     )
+
+
+TITLE_TAIL = re.compile(
+    r"(?:,\s*|\s+)(?:\(?(?:19|20)\d{2}[a-z]?\)?|pages?\s+[\d\s–—-]+|pp\.?\s*[\d\s–—-]+|vol(?:ume)?\.?\s*\d+[^,]*|"
+    r"arXiv(?:\s+preprint)?(?:\s+arXiv)?:?\s*\d{4}\.\d{4,5}(?:v\d+)?|URL\s+\S+)\s*$",
+    re.I,
+)
+
+
+def clean_title(title: str) -> str:
+    """A title as printed by a bibliography style, without what some styles put after it.
+
+    >>> clean_title("Constitutional ai: Harmlessness from ai feedback, 2022.")
+    'Constitutional ai: Harmlessness from ai feedback'
+    >>> clean_title("Learning Dynamic Robot-to-Human Object Handover from Human Feedback, pages 161–176")
+    'Learning Dynamic Robot-to-Human Object Handover from Human Feedback'
+    >>> clean_title("Deep learning in 2020 and beyond")
+    'Deep learning in 2020 and beyond'
+    """
+    title = re.sub(r"[.,;:\s]+$", "", title)
+    for _ in range(3):
+        new = re.sub(r"[.,;:\s]+$", "", TITLE_TAIL.sub("", title))
+        if new == title or len(new) < 8:
+            break
+        title = new
+    return title
 
 
 def family_names(author_part: str) -> list[str]:
