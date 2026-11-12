@@ -21,9 +21,11 @@ END = re.compile(
     r"[A-H](?:\.\d+)?\s+[A-Z][A-Za-z\-]+(?:\s+[A-Za-z\-]+){0,8})\s*$",
     re.M,
 )
+# How an entry's last line ends: a period, or a year, an arXiv id or a URL with no period after it.
+ENTRY_END = re.compile(r"(?:\.|(?:19|20)\d{2}[a-z]?\)?|\d{4}\.\d{4,5}(?:v\d+)?|https?://\S+)\s*$")
 NAME_START = re.compile(r"^(?:[A-Z][\w'’\-]+(?:\s+(?:[A-Z]\.\s*)+)?(?:\s+(?:van|von|de|der|da|di|le|la)\b)?(?:\s+[A-Z][\w'’\-]+)?)(?:,|\s+and\s)")
 ABBREVIATIONS = (
-    r"(?:et al|vs|Proc|Conf|Int|Intl|Adv|Vol|vol|pp|No|no|Jr|Sr|Dr|St|Univ|Dept|Inc|Ltd|Comput|Assoc|Ling|Mach|Learn|"
+    r"(?:vs|Proc|Conf|Int|Intl|Adv|Vol|vol|pp|No|no|Jr|Sr|Dr|St|Univ|Dept|Inc|Ltd|Comput|Assoc|Ling|Mach|Learn|"
     r"Res|Trans|Syst|Neural|Inf|Process|Rev|Lett|Phys|Sci|Eng|Stat|Math|Appl|J|Am|Soc|Ann|Nat)"
 )
 
@@ -66,7 +68,7 @@ def split_entries(section: str) -> list[str]:
     for line in (x.strip() for x in section.split("\n")):
         if not line:
             continue
-        if not entries or (entries[-1][-1].rstrip().endswith(".") and NAME_START.match(line)):
+        if not entries or (ENTRY_END.search(entries[-1][-1]) and NAME_START.match(line)):
             entries.append([line])
         else:
             entries[-1].append(line)
@@ -95,6 +97,10 @@ def reference_from_string(key: str, s: str, number: int = 0) -> Reference:
     >>> (r.title, r.authors, r.year)
     ('Attention is all you need', ['Vaswani', 'Shazeer'], 2017)
     """
+    # PDF text often loses the space after a period: "linear time.arXiv preprint", "2017.In Proceedings"
+    s = re.sub(r"(?<=[a-z0-9)])([.?!])(?=(?:arXiv|ArXiv|CoRR|In\b|Proceedings|Advances|URL|https?:|Technical|Preprint)\b)", r"\1 ", s)
+    # and adds one before it after an initial: "Y . Bai", "V . Chandrasekaran"
+    s = re.sub(r"\b([A-Z]) \.(?=[\s,])", r"\1.", s)
     doi = m.group(0) if (m := DOI.search(s)) else ""
     arx = ""
     if m := re.search(r"arXiv[:\s]*(?:preprint\s+)?(?:arXiv:)?\s*(\d{4}\.\d{4,5})|arxiv\.org/(?:abs|pdf)/(\d{4}\.\d{4,5})", s, re.I):
@@ -106,7 +112,9 @@ def reference_from_string(key: str, s: str, number: int = 0) -> Reference:
     else:
         # LNCS: "Names: Title. In: ..."
         c = re.match(r"^([^:]{3,400}?):\s+(.*)$", s)
-        if c and re.search(r",|\band\b", c.group(1)) and len(family_names(c.group(1))) >= 1 and not re.search(r"\b(?:19|20)\d{2}\b", c.group(1)[-6:]):
+        # only when what precedes the colon is one sentence of names ("Vaswani, A., Shazeer, N.:"), not authors and
+        # the first half of a title ("D. Kingma and J. Ba. Adam: A method ...")
+        if c and re.search(r",|\band\b", c.group(1)) and len(_sentences(c.group(1))) == 1 and not re.search(r"\b(?:19|20)\d{2}\b", c.group(1)[-6:]):
             authors_part, rest = c.group(1), c.group(2)
             segs = _sentences(rest)
             title, venue = (segs[0], " ".join(segs[1:])) if segs else ("", "")
@@ -141,7 +149,9 @@ def _sentences(s: str) -> list[str]:
     """Split at ". " but not after initials (A. Vaswani) or common abbreviations (et al., Proc.)."""
     protected = re.sub(r"\b([A-Z])\.(?=\s|,|-)", "\\1\x00", s)
     protected = re.sub(r"\b(" + ABBREVIATIONS + r")\.(?=\s)", "\\1\x00", protected)
-    return [p.replace("\x00", ".").strip() for p in re.split(r"\.\s+", protected) if p.strip()]
+    # a title may end with ? or ! (kept), then the venue: "Can active memory replace attention? In NeurIPS"
+    parts = re.split(r"\.\s+|(?<=[?!])\s+(?=[A-Z])", protected)
+    return [p.replace("\x00", ".").strip() for p in parts if p and p.strip()]
 
 
 def references_from_pdf(path: Path) -> list[Reference]:

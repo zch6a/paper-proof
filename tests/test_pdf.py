@@ -63,6 +63,20 @@ def test_author_year_entries_from_a_pdf(tmp_path):
     assert refs[2].arxiv == "2304.99999" and refs[2].cited_as_preprint
 
 
+def test_quirks_of_pdf_text_seen_in_real_papers():
+    # a space before the period of an initial (DPO's PDF), "et al." ending the authors, no space after a period
+    r = reference_from_string("1", "Y . Bai, A. Jones, K. Ndousse, et al. Training a helpful and harmless assistant. arXiv preprint, 2022.")
+    assert r.title == "Training a helpful and harmless assistant" and r.authors[0] == "Bai"
+    r = reference_from_string("2", "N. Kalchbrenner, L. Espeholt. Neural machine translation in linear time.arXiv preprint arXiv:1610.10099, 2017.")
+    assert r.title == "Neural machine translation in linear time" and r.arxiv == "1610.10099"
+    r = reference_from_string(
+        "3", "L. Kaiser and S. Bengio. Can active memory replace attention? In Advances in Neural Information Processing Systems, 2016."
+    )
+    assert r.title == "Can active memory replace attention?"
+    r = reference_from_string("4", "D. Kingma and J. Ba. Adam: A method for stochastic optimization. In ICLR, 2015.")
+    assert r.title == "Adam: A method for stochastic optimization"
+
+
 def test_numbered_styles():
     bracketed = (
         "References\n[1] A. Vaswani, N. Shazeer. Attention is all you need. In NIPS, 2017.\n"
