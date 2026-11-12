@@ -33,7 +33,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="a LaTeX project folder, its main .tex file, a .bib, a compiled .bbl, a PDF (references only), or an arXiv id (2106.09685)",
     )
     p.add_argument("--format", choices=["text", "json", "md"], default="text", help="report format (default: text)")
-    p.add_argument("--fail-on", choices=list(FAIL_LEVELS), default="not-found", help="exit 1 when there are references this bad (default: not-found)")
+    p.add_argument(
+        "--fail-on",
+        choices=list(FAIL_LEVELS),
+        default="not-found",
+        help="when to exit 1: not-found (default: invented or retracted references, undefined citations and labels), "
+        "mismatch (also wrong reference details and number warnings), never",
+    )
     p.add_argument("--jobs", type=int, default=4, help="references checked at once (default 4; each database is still asked politely)")
     p.add_argument("--no-cache", action="store_true", help="ask the databases again instead of using answers cached on disk")
     p.add_argument("--cache-dir", type=Path, default=None, help=f"where answers are cached (default: {default_cache_dir()})")

@@ -4,7 +4,7 @@
 
 **投稿前，先替审稿人把论文查一遍。** 每条参考文献真的存在、信息对得上；加粗的确实是最好的结果；“从 27.3
 提升到 28.9，提升 9.5%”算得对；摘要里的数字和表格里的一致；没有哪个 `\ref` 印出来是 **??**。
-一条命令查整个 LaTeX 工程，每个问题都给出文件和行号。
+一条命令查你的 LaTeX 工程、任意一篇 arXiv 论文（给编号即可）或一个 PDF，每个问题都给出文件和行号。
 
 <a href="https://github.com/zch6a/paper-proof/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/zch6a/paper-proof/actions/workflows/ci.yml/badge.svg"></a>
 <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue">
@@ -111,6 +111,8 @@ uvx --from git+https://github.com/zch6a/paper-proof paper-proof path/to/paper
 paper-proof paper/                 # LaTeX 工程文件夹（自动找主文件），全部检查
 paper-proof paper/main.tex         # 指定主文件
 paper-proof paper/ --offline       # 只查数字、标签和引用：不发送任何内容
+paper-proof 2106.09685             # 任意 arXiv 论文：取它的 LaTeX 源码到临时目录，查完删除
+paper-proof paper.pdf              # PDF：查参考文献（PDF 的文字里表格丢了加粗信息）
 paper-proof refs.bib               # 只查一个参考文献库
 paper-proof paper/ --format json   # 每个问题带文件和行号，给脚本用
 paper-proof paper/ --format md     # Markdown 表格，贴进 PR 或审稿意见

@@ -4,7 +4,8 @@
 
 **Check your paper before reviewers do.** Every cited reference exists and matches its entry; bold results really
 are the best; "from 27.3 to 28.9, a 9.5% gain" adds up; the numbers in the abstract are the ones in your tables; no
-`\ref` prints as **??**. On a LaTeX project, in one command, with the file and line of everything it finds.
+`\ref` prints as **??**. On your LaTeX project, any arXiv paper by its id, or a PDF, in one command, with the file
+and line of everything it finds.
 
 <a href="https://github.com/zch6a/paper-proof/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/zch6a/paper-proof/actions/workflows/ci.yml/badge.svg"></a>
 <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue">
@@ -121,6 +122,8 @@ or install it: `uv tool install git+https://github.com/zch6a/paper-proof` (or `p
 paper-proof paper/                 # a LaTeX project folder (the main .tex is found), all checks
 paper-proof paper/main.tex         # the main file
 paper-proof paper/ --offline       # numbers, labels and citations only: nothing is sent anywhere
+paper-proof 2106.09685             # any arXiv paper: its LaTeX source, in a temporary folder deleted afterwards
+paper-proof paper.pdf              # a PDF: its references (tables lose their bold in a PDF's text)
 paper-proof refs.bib               # just a bibliography
 paper-proof paper/ --format json   # every finding with file and line, for scripts
 paper-proof paper/ --format md     # a Markdown table, for a pull request or a review
