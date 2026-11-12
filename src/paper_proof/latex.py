@@ -99,17 +99,23 @@ def find_main(directory: Path) -> Path | None:
     """The file with \\documentclass and \\begin{document}; main.tex, paper.tex or ms.tex when there are several."""
     candidates = []
     for p in sorted(directory.rglob("*.tex")):
+        if p.name.startswith(("_region_", "_preview")):  # editor scratch files (AUCTeX previews)
+            continue
         try:
             t = strip_comments(p.read_text(encoding="utf-8", errors="replace"))
         except OSError:
             continue
         if "\\documentclass" in t and "\\begin{document}" in t:
-            candidates.append(p)
+            has_bib = bool(re.search(r"\\bibliography\{|\\addbibresource|\\begin\{thebibliography\}|\\printbibliography", t))
+            candidates.append((p, has_bib, len(t)))
     for name in ("main.tex", "paper.tex", "ms.tex", "manuscript.tex"):
-        for p in candidates:
+        for p, _, _ in candidates:
             if p.name.lower() == name:
                 return p
-    return min(candidates, key=lambda p: (len(p.relative_to(directory).parts), p.name)) if candidates else None
+    if not candidates:
+        return None
+    # the one with a bibliography, nearest the top, longest
+    return min(candidates, key=lambda c: (not c[1], len(c[0].relative_to(directory).parts), -c[2]))[0]
 
 
 def _resolve(root: Path, base: Path, name: str, ext: str) -> Path | None:

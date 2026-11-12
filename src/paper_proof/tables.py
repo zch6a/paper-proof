@@ -18,6 +18,7 @@ RULE = re.compile(
     r"\\(?:toprule|midrule|bottomrule|hline|specialrule|cmidrule|cline|hdashline|addlinespace|endhead|endfirsthead|endfoot|endlastfoot)\b"
     r"(?:\s*\([^)]*\))?(?:\s*\{[^}]*\})*(?:\s*\[[^\]]*\])?"
 )
+FULL_RULE = re.compile(r"\\(?:toprule|midrule|bottomrule|hline|specialrule|hdashline)\b")
 NUMBER = re.compile(r"(?<![\w.])[-−]?\d+(?:,\d{3})*(?:\.\d+)?(?![\w.])")
 BOLD = re.compile(r"\\(?:textbf|mathbf|boldsymbol|bm|pmb)\s*\{|\{\s*\\bf(?:series)?\b|\\bf(?:series)?\b|\\cellcolor\{best\}")
 UNDERLINE = re.compile(r"\\(?:underline|ul|uline)\s*\{")
@@ -223,7 +224,8 @@ def find_tables(text: str, file: str = "") -> list[Table]:
         t = Table(file=file, line=text.count("\n", 0, m.start()) + 1, label=label, caption=cap)
         group, seen_body, header_done = 0, False, False
         for row, off in _split(body, "\\\\"):
-            rules = list(RULE.finditer(row))
+            # full-width rules end the header and separate groups of rows; \cmidrule and \cline only underline a span
+            rules = [r for r in RULE.finditer(row) if FULL_RULE.match(r.group(0))]
             if rules and seen_body:
                 group += 1
             clean = RULE.sub(lambda r: " " * len(r.group(0)), row)

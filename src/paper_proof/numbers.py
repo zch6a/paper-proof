@@ -57,6 +57,10 @@ def bold_not_best(t: Table) -> list[Finding]:
     headers = " ".join(c.text for r in t.rows[: t.header_rows] for c in r)
     if re.search(r"\\Delta|Δ|\bdiff\b|\bgain\b", headers, re.I):
         return []  # a pairwise comparison: bold marks the winner of each pair, not the best of a column
+    if _diagonal(t):
+        return []  # one bold per row, moving right: a marked setting (train length = test length), not a best
+    if _marks_extremes(t):
+        return []  # bold marks the largest values even where lower is better: "notable", not "best"
     if _row_oriented(t):
         return _bold_not_best_by_row(t)
     out = []
@@ -73,6 +77,8 @@ def bold_not_best(t: Table) -> list[Finding]:
             group = [(k, d) for k, d in col if t.groups[k] == t.groups[i]]
             if sum(1 for _, d in group if d.bold) > 1:
                 continue
+            if len(group) == 1 and len(bolds) > 1:
+                continue  # a group of one row, other groups have their own bold: best of each category
             if _is_best(c.value, [d for _, d in col], want) or (len(group) > 1 and _is_best(c.value, [d for _, d in group], want)):
                 continue
             k, d = _better(c.value, group if len(group) > 2 else col, want)
@@ -102,7 +108,31 @@ def _row_oriented(t: Table) -> bool:
             group = [d for k, d in t.column(j) if t.groups[k] == t.groups[i]]
             by_row += len(row) > 2 and _is_best(c.value, row, direction(t.row_name(i)))
             by_col += len(col) > 2 and (_is_best(c.value, col, _want(t, j)) or (len(group) > 1 and _is_best(c.value, group, _want(t, j))))
-    return by_row > by_col
+    body_rows = len(t.rows) - t.header_rows
+    # clearly more often, and in a table big enough to tell
+    return body_rows >= 3 and by_row >= 3 and by_row > 2 * by_col
+
+
+def _marks_extremes(t: Table) -> bool:
+    agree = against = 0
+    for j in range(max((len(r) for r in t.rows), default=0)):
+        want = _want(t, j)
+        col = [d for _, d in t.column(j)]
+        if not want or len(col) < 3:
+            continue
+        for c in col:
+            if c.bold:
+                if _is_best(c.value, col, want):
+                    agree += 1
+                elif _is_best(c.value, col, "lower" if want == "higher" else "higher"):
+                    against += 1
+    return against >= 2 and against >= agree
+
+
+def _diagonal(t: Table) -> bool:
+    cells = [(i, j) for i, r in enumerate(t.rows[t.header_rows :]) for j, c in enumerate(r) if c.bold and c.value is not None]
+    rows, cols = [i for i, _ in cells], [j for _, j in cells]
+    return len(cells) >= 3 and len(set(rows)) == len(cells) and len(set(cols)) == len(cells) and cols == sorted(cols) and rows == sorted(rows)
 
 
 def _want(t: Table, j: int) -> str:
@@ -211,6 +241,8 @@ def change_claims(text: str, file: str, line_of) -> list[Finding]:
         start, sentence = lo, text[lo:hi]
         if not CHANGE_WORD.search(sentence):
             continue
+        if re.search(r"rang\w*|var(?:y|ies|ying|ied)|spann?\w*|between", text[max(lo, m.start() - 25) : m.start()], re.I):
+            continue  # "ranging from 33% to 90%": a range of values, not a change from one to the other
         rest = sentence.replace(m.group(0), " " * len(m.group(0)))
         ea, eb = _tol(_dec(a_s)), _tol(_dec(b_s))
         rel = _interval(lambda x, y: abs(y - x) / abs(x) * 100, a, ea, b, eb)
@@ -392,8 +424,12 @@ def labels(texts: dict[str, str]) -> list[Finding]:
             if k in defined:
                 f0, l0, _, cond0 = defined[k]
                 if not conditional and not cond0:
-                    msg = f"label {k} is also defined at {f0}:{l0}: references to it are ambiguous"
-                    out.append(Finding("duplicate-label", "error", file, line, msg))
+                    if k in used:
+                        msg = f"label {k} is also defined at {f0}:{l0}: references to it point to only one of them"
+                        out.append(Finding("duplicate-label", "error", file, line, msg))
+                    else:
+                        msg = f"label {k} is also defined at {f0}:{l0} (nothing refers to it yet)"
+                        out.append(Finding("duplicate-label", "note", file, line, msg))
                 continue
             defined[k] = (file, line, kind, conditional)
     for file, text in texts.items():

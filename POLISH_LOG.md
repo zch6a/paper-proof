@@ -10,3 +10,7 @@
   - LoRA（2106.09685）GLUE 表 QQP 列：加粗 91.9，同组 92.1 更高（标题写明“越高越好”）；
   - LLaVA（2304.08485）：标签 tab:full_example_car_bbox 在正文和附录各定义一次；
   - vLLM（2309.06180）：标签 eq:attention-layer 定义了两次，正文引用的其实是第二个公式。
+- 扩到 50 篇（加了 Chinchilla、Flan、BLIP-2、SAM、Whisper、ControlNet、ReAct、QLoRA、Mistral、DINOv2、ConvNeXt、Swin 等 30 篇）再量：新出现的误报来自对角线加粗（ALiBi）、加粗表示“最大”而非“最好”（MT-Bench）、每组一行各自加粗（Mistral）、表头里的 \cmidrule、“ranging from 33% to 90%”这类区间、AUCTeX 的 _region_.tex 被当成主文件；逐个修正并写进测试。
+  - 现在 50 篇共报 6 条错误/警告，**逐条对照源码全部属实**：上面 3 条，加上 DINOv2（2304.07193）数据消融表 ADE-20k 加粗 47.7、但 Uncurated data 是 48.5；BLIP-2（2301.12597）fig:example_limitation 两张图共用一个标签；LLaVA-1.5（2310.03744）两张表都叫 tab:results。
+  - 没人引用的重复标签降为提示（Flan 附录里十张表都叫 tab:my-table，留着无害）。
+  - 摘要数字、“从 A 到 B 提升 p%”两项在这 50 篇里没有报出问题：要么这些著名论文确实没写错，要么检出偏保守。下一步用人为注入的错误量检出率。

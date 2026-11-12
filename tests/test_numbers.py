@@ -84,6 +84,31 @@ Accuracy & 50 & \textbf{60} & 55 \\ F1 & 80 & 70 & \textbf{85} \\ BLEU & \textbf
     assert f.message == "table at :1, row BLEU: 65 is bold but 95 in the same row is higher"
 
 
+def test_conventions_seen_in_real_papers_are_not_errors():
+    # A diagonal of bold cells (ALiBi: train length = evaluation length).
+    diag = r"""\begin{tabular}{rccc}\toprule Train & 64 & 128 & 256 \\ \midrule
+64 & \textbf{28.5} & 24.7 & 22.9 \\ 128 & - & \textbf{24.0} & 21.7 \\ 256 & - & - & \textbf{21.3} \\ \bottomrule\end{tabular}"""
+    assert bold_not_best(find_tables(diag)[0]) == []
+    # Bold marks the largest values even where lower is better (MT-Bench's position-bias tables).
+    extremes = r"""\begin{tabular}{lcc}\toprule Judge & Error & Loss \\ \midrule
+A & \textbf{9.0} & 1.2 \\ B & 2.0 & \textbf{3.8} \\ C & 5.0 & 0.0 \\ D & 3.0 & 2.5 \\ \bottomrule\end{tabular}"""
+    assert bold_not_best(find_tables(extremes)[0]) == []
+    # Each row its own group, each with a bold (Mistral's table): best of each category.
+    groups = r"""\begin{tabular}{lc}\toprule Model & NQ \\ \midrule
+A & 24.7 \\ B & \textbf{29.0} \\ \midrule C & 11.0 \\ \midrule D & \textbf{28.8} \\ \bottomrule\end{tabular}"""
+    assert bold_not_best(find_tables(groups)[0]) == []
+    # \cmidrule between two header rows does not end the header (DINO's table with a Δ column).
+    cmid = r"""\begin{tabular}{lccc}\toprule & \multicolumn{3}{c}{k-NN} \\ \cmidrule{2-4} & RN50 & ViT & $\Delta$ \\ \midrule
+a & 1.0 & 2.0 & 1.0 \\ b & 3.0 & 4.0 & 1.0 \\ c & 2.0 & 9.0 & \textbf{7.0} \\ \bottomrule\end{tabular}"""
+    (t,) = find_tables(cmid)
+    assert t.header_rows == 2 and bold_not_best(t) == []
+
+
+def test_a_range_is_not_a_change():
+    s = "the relative performance gain ranging from 33\\% to 90\\% and averaging 62\\%."
+    assert change_claims(s, "a.tex", lines(s)) == []
+
+
 def test_parse_value():
     assert parse_value(r"$\mathbf{75.30}_{\pm 0.2}$")[:2] == (75.3, 2)
     assert parse_value("1,024")[:2] == (1024.0, 0)
@@ -125,10 +150,18 @@ We reach 28.4 BLEU, 1.1 BLEU above the baseline (+4.0\%), and 31.7 on GPT-3.5 pr
 def test_labels():
     texts = {
         "main.tex": "\\begin{figure}\\caption{x}\\label{fig:a}\\end{figure}\nSee Table~\\ref{tab:main} and \\cref{sec:intro,fig:b}.\n" + TABLE,
-        "intro.tex": "\\section{Intro}\\label{sec:intro}\n\\label{sec:intro}",
+        "intro.tex": "\\section{Intro}\\label{sec:intro}\n\\label{sec:other}\n\\label{sec:other}",
     }
     kinds = sorted((f.kind, f.message.split(" ")[0] if f.kind != "unreferenced" else f.message) for f in labels(texts))
     assert ("duplicate-label", "label") in kinds
+    # a duplicate nobody refers to is only a note; one that is referred to is an error
+    sev = {f.severity for f in labels(texts) if f.kind == "duplicate-label"}
+    assert sev == {"note"}
+    texts["main.tex"] += "\\ref{sec:other}"
+    assert {f.severity for f in labels(texts) if f.kind == "duplicate-label"} == {"error"}
+    # labels inside a macro body or a toggle branch are not duplicates; #1 is a parameter, not a label
+    macro = {"m.tex": r"\newcommand{\figa}{\begin{figure}\label{fig:x}\end{figure}}\iftoggle{v}{\label{fig:x}}{}\newcommand{\r}[1]{\ref{#1}}"}
+    assert labels(macro) == [f for f in labels(macro) if f.kind == "unreferenced"]
     assert ("undefined-ref", "reference") in kinds
     assert ("unreferenced", "figure fig:a is never referred to in the text") in kinds
     assert not any("tab:main" in k[1] for k in kinds)

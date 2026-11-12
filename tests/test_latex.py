@@ -47,6 +47,20 @@ def test_find_main_in_a_folder(tmp_path):
     assert find_main(project(tmp_path)) == tmp_path / "main.tex"
 
 
+def test_find_main_skips_editor_previews_and_prefers_the_one_with_a_bibliography(tmp_path):
+    doc = "\\documentclass{article}\\begin{document}x\\end{document}"
+    (tmp_path / "_region_.tex").write_text(doc, encoding="utf-8")
+    (tmp_path / "a_cover.tex").write_text(doc, encoding="utf-8")
+    (tmp_path / "flash2.tex").write_text(doc.replace("x", "\\bibliography{refs}"), encoding="utf-8")
+    assert find_main(tmp_path).name == "flash2.tex"
+
+
+def test_dead_code_is_not_read(tmp_path):
+    (tmp_path / "main.tex").write_text(MAIN.replace(r"\input{sections/intro}", r"\iffalse \cite{gone} \fi"), encoding="utf-8")
+    shutil.copy(FIX / "references.bib", tmp_path / "refs.bib")
+    assert "gone" not in read_project(tmp_path / "main.tex").cited
+
+
 def test_command_line_on_a_project_checks_only_what_is_cited(tmp_path, capsys):
     code = run([str(project(tmp_path)), "--format", "json"], ReplayTransport(dict(ANSWERS)))
     data = json.loads(capsys.readouterr().out)
