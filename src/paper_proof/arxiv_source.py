@@ -19,7 +19,9 @@ MAX_BYTES = 200 * 1024 * 1024  # arXiv's own limit on a source is 50 MB compress
 
 
 def is_arxiv_id(s: str) -> bool:
-    """>>> is_arxiv_id("2106.09685"), is_arxiv_id("arXiv:2106.09685v2"), is_arxiv_id("hep-th/9901001"), is_arxiv_id("paper/")
+    """New-style and old-style ids, with or without a version and the arXiv: prefix.
+
+    >>> is_arxiv_id("2106.09685"), is_arxiv_id("arXiv:2106.09685v2"), is_arxiv_id("hep-th/9901001"), is_arxiv_id("paper/")
     (True, True, True, False)
     """
     return bool(ID.match(s.strip()))

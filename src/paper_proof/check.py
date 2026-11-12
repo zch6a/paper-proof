@@ -35,7 +35,9 @@ class Reference:
 
 
 def clean_doi(s: str) -> str:
-    """>>> clean_doi("https://doi.org/10.1109/CVPR.2016.90 ")
+    """A DOI without its resolver prefix, in lower case.
+
+    >>> clean_doi("https://doi.org/10.1109/CVPR.2016.90 ")
     '10.1109/cvpr.2016.90'
     """
     s = s.strip()

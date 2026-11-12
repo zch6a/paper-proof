@@ -142,7 +142,9 @@ def _want(t: Table, j: int) -> str:
 
 
 def caption_direction(caption: str) -> str:
-    """>>> caption_direction("GLUE results. Higher is better for all metrics.")
+    """What a caption says about the whole table.
+
+    >>> caption_direction("GLUE results. Higher is better for all metrics.")
     'higher'
     """
     hi = re.search(r"higher (?:is|=) better|higher values? (?:is|are) better|\(higher is better\)", caption, re.I)

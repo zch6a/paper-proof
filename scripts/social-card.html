@@ -1,0 +1,56 @@
+<!doctype html>
+<!-- The repository's social preview (1280×640): docs/social-preview.png, rendered from this page with headless Chrome
+     (chrome --headless --screenshot --window-size=1280,640). The output is paper-proof's on examples/paper, shortened. -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden; }
+  body { background: radial-gradient(1100px 700px at 12% 8%, #1a2433 0%, #10141b 55%, #0b0d11 100%); color: #e6edf3;
+    font-family: "Segoe UI", -apple-system, system-ui, sans-serif; display: grid; grid-template-columns: 430px 1fr; gap: 40px;
+    padding: 0 52px 0 70px; box-sizing: border-box; align-items: center; }
+  h1 { font-size: 64px; margin: 0 0 16px; letter-spacing: -1.5px; }
+  h1 span { color: #58a6ff; }
+  .tag { font-size: 32px; line-height: 1.22; margin: 0 0 22px; font-weight: 600; }
+  .sub { font-size: 18.5px; line-height: 1.5; color: #b1bac4; margin: 0 0 26px; }
+  .pills { display: flex; gap: 9px; flex-wrap: wrap; }
+  .pills span { font-size: 14.5px; border: 1px solid #30363d; background: #161b22; border-radius: 999px; padding: 6px 12px; color: #c9d1d9; }
+  .term { background: #0d1117; border: 1px solid #30363d; border-radius: 12px; box-shadow: 0 26px 70px rgba(0,0,0,.55); overflow: hidden; }
+  .bar { display: flex; gap: 7px; align-items: center; padding: 11px 14px; background: #161b22; border-bottom: 1px solid #30363d; }
+  .bar i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .bar b { margin-left: 10px; font: 600 13px "Segoe UI", sans-serif; color: #8b949e; }
+  pre { margin: 0; padding: 16px 18px 18px; font: 13.4px/1.62 Consolas, "Cascadia Mono", ui-monospace, monospace; color: #c9d1d9; white-space: pre-wrap; }
+  .p { color: #7ee787; } .e { color: #ff7b72; font-weight: 700; } .w { color: #e3b341; } .n { color: #8b949e; } .k { color: #79c0ff; }
+  .h { color: #e6edf3; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div>
+    <h1>paper-<span>proof</span></h1>
+    <p class="tag">Check your paper<br>before reviewers do.</p>
+    <p class="sub">Invented or wrong references, bold results that are not the best, gains that do not add up, stale numbers in the abstract, labels that print as ??. One command, with file and line.</p>
+    <div class="pills"><span>Crossref · arXiv · S2 · OpenAlex</span><span>Number checks offline</span><span>LaTeX · PDF · arXiv id</span><span>No AI</span></div>
+  </div>
+  <div class="term">
+    <div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><b>paper-proof paper/</b></div>
+<pre><span class="p">$</span> paper-proof paper/
+<span class="h">The paper against itself:</span>
+<span class="e">ERROR  </span>  main.tex:23  reference to <span class="k">tab:ablaton</span>, never defined: prints as ??
+<span class="w">WARNING</span>  main.tex:15  the abstract says 29.1, which is not in
+                     the text or any table (an outdated number?)
+<span class="w">WARNING</span>  main.tex:26  from 27.3 to 28.9 is a 5.9% relative
+                     change (1.6 points), not 9.5%
+<span class="w">WARNING</span>  main.tex:40  BLEU ↑: 28.1 is bold but 28.9 is higher
+
+<span class="h">References:</span>
+<span class="e">NOT FOUND</span> li2023recursive (refs.bib:22)
+          Recursive Gradient Folding for Parameter-Efficient ...
+          - arXiv id 2304.99999 does not exist
+<span class="w">MISMATCH </span> houlsby2019parameter (refs.bib:15)
+          - year is 2019, not 2018
+<span class="n">ok       </span> devlin2019bert · published in NAACL (2019)
+
+<span class="h">Summary:</span> 1 NOT FOUND, 1 MISMATCH, 1 ERROR, 3 WARNINGS</pre>
+  </div>
+</body>
+</html>
