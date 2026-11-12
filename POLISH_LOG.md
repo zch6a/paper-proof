@@ -74,3 +74,9 @@
   表格正常渲染，没有链接、图片、提及或 HTML（scripts/check_github_render.py 可复跑）。顺带修了“1 references”的单复数。
 - **演示图** docs/demo.png（scripts/render_demo.py）：真实的彩色终端输出转成 HTML 再用无头 Chrome 渲染，不截屏幕；放在 README 顶部，文字版收进折叠块。
   - 做图时发现：环境里设了 NO_COLOR 时 FORCE_COLOR 不生效。改为显式的 FORCE_COLOR 优先，并加 `--color auto|always|never`（有测试）。
+
+## 第 4 轮打磨（2026-11-13）
+
+- **代码结构**：numbers.py 涨到 650 行，按检查拆成 paper_proof/checks/ 下六个模块（common、bold、changes、stale、labels、averages，各 80–150 行），numbers.py 只留 check_numbers 和对外的名字（测试和测量脚本照旧能用）。用脚本按 AST 搬运，不手抄；拆完 50 篇论文的发现与注入检出完全一致。
+- **死代码**：删掉没用的 POINTS 正则、_numbers_in、表格单元的 underline 字段和 UNDERLINE 正则（下划线检查早已去掉）。
+- **类型**：mypy 第一次跑出 26 处。其中真问题：`urllib.request.quote` 不是公开接口（改用 urllib.parse.quote）；arxiv_source.fetch 遇到非法编号会在 None 上取 group（改为明确的 ValueError）；bib.py 一个变量先当整数后当匹配对象。其余是 Optional：给 Cell 加了断言过的 `num` 属性，已知是数字的格子都用它。现在 mypy 零问题，加入 dev 依赖和 CI。

@@ -210,6 +210,7 @@ def check_reference(ref: Reference, t: Transport) -> Verdict:
             candidates.append(r)
 
     # 2. The title, in each database until one has it. Without a title, the identifier's record is the work.
+    best: Record | None
     if not ref.title and candidates:
         best, score = candidates[0], 1.0
         v.title = best.title
@@ -228,7 +229,7 @@ def check_reference(ref: Reference, t: Transport) -> Verdict:
             best, score = _best(ref, candidates)
             # Stop at the same title, unless the record's first author disagrees: another record of that title
             # (a reprint, a namesake) may be the one cited ("A mathematical theory of communication").
-            if score >= SAME_TITLE and (not ref.authors or not best.authors or author_overlap(ref.authors, best.authors)[1]):
+            if best is not None and score >= SAME_TITLE and (not ref.authors or not best.authors or author_overlap(ref.authors, best.authors)[1]):
                 break
 
     # 2b. A reference read from a PDF, whose title may be cut wrong: the whole entry, matched by Crossref and

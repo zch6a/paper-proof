@@ -89,21 +89,21 @@ def _arxiv_records(xml: str) -> list[Record]:
     except ET.ParseError as e:
         raise TransportError("export.arxiv.org: not XML") from e
     out = []
-    for e in root.findall("a:entry", _ATOM):
-        ident = (e.findtext("a:id", "", _ATOM) or "").rsplit("/abs/", 1)[-1]
-        title = re.sub(r"\s+", " ", e.findtext("a:title", "", _ATOM) or "").strip()
+    for entry in root.findall("a:entry", _ATOM):
+        ident = (entry.findtext("a:id", "", _ATOM) or "").rsplit("/abs/", 1)[-1]
+        title = re.sub(r"\s+", " ", entry.findtext("a:title", "", _ATOM) or "").strip()
         if not ident or title == "Error":
             continue
-        authors = [re.sub(r"\s+", " ", a.findtext("a:name", "", _ATOM) or "").strip() for a in e.findall("a:author", _ATOM)]
-        journal = (e.findtext("arxiv:journal_ref", "", _ATOM) or "").strip()
+        authors = [re.sub(r"\s+", " ", a.findtext("a:name", "", _ATOM) or "").strip() for a in entry.findall("a:author", _ATOM)]
+        journal = (entry.findtext("arxiv:journal_ref", "", _ATOM) or "").strip()
         out.append(
             Record(
                 source="arxiv",
                 title=title,
                 authors=authors,
-                year=_year(e.findtext("a:published", "", _ATOM)),
+                year=_year(entry.findtext("a:published", "", _ATOM)),
                 venue="arXiv",
-                doi=(e.findtext("arxiv:doi", "", _ATOM) or "").lower(),
+                doi=(entry.findtext("arxiv:doi", "", _ATOM) or "").lower(),
                 arxiv=re.sub(r"v\d+$", "", ident),
                 url=f"https://arxiv.org/abs/{re.sub(r'v[0-9]+$', '', ident)}",
                 kind="preprint",

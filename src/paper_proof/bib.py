@@ -127,9 +127,9 @@ def _fields(body: str, macros: dict[str, str], line: int):
                 token = w.group(0)
                 parts.append(token if token.isdigit() else macros.get(token.lower(), token))
                 i = w.end()
-            j = re.compile(r"\s*#\s*").match(body, i)
-            if j:
-                i = j.end()
+            concat = re.compile(r"\s*#\s*").match(body, i)
+            if concat:
+                i = concat.end()
                 continue
             break
         yield name, "".join(parts).strip()
@@ -191,7 +191,8 @@ def authors(field_value: str) -> list[str]:
     ['van Beethoven', 'de la Fontaine']
     """
     names: list[str] = []
-    depth, cur, i = 0, [], 0
+    depth, i = 0, 0
+    cur: list[str] = []
     s = field_value
     sep = re.compile(r"\s+and\s+", flags=re.I)
     while i < len(s):
@@ -240,7 +241,9 @@ def _depth0(s: str) -> str:
 
 
 def _depth0_split(s: str) -> list[str]:
-    parts, depth, cur = [], 0, []
+    parts: list[str] = []
+    cur: list[str] = []
+    depth = 0
     for c in s:
         if c == "{":
             depth += 1

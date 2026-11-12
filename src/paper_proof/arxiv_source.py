@@ -34,7 +34,10 @@ def fetch(arxiv_id: str, into: Path, timeout: float = 60.0) -> Path:
     import urllib.error
     import urllib.request
 
-    aid = ID.match(arxiv_id.strip()).group(1)
+    m = ID.match(arxiv_id.strip())
+    if not m:
+        raise ValueError(f"not an arXiv id: {arxiv_id!r}")
+    aid = m.group(1)
     req = urllib.request.Request(f"https://arxiv.org/e-print/{aid}", headers={"User-Agent": USER_AGENT})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:

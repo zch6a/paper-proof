@@ -9,7 +9,7 @@ have said.
 ```bash
 uv sync
 uv run pytest -q        # never reaches the network: database answers are recorded in tests/fixtures
-uv run ruff check . && uv run ruff format --check .
+uv run ruff check . && uv run ruff format --check . && uv run mypy
 ```
 
 - A new rule for the number checks comes with a test built from the real case that motivated it (a few lines of

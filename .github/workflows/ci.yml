@@ -23,6 +23,7 @@ jobs:
       - run: uv run pytest -q
       - run: uv run ruff check .
       - run: uv run ruff format --check .
+      - run: uv run mypy
   # The action itself, on the example paper, offline.
   action:
     runs-on: ubuntu-latest

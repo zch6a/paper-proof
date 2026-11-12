@@ -33,12 +33,16 @@ build-backend = "hatchling.build"
 packages = ["src/paper_proof"]
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff>=0.6"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]
 pythonpath = ["src"]
 addopts = "--doctest-modules --import-mode=importlib"
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src/paper_proof"]
 
 [tool.ruff]
 line-length = 150

@@ -1,4 +1,4 @@
-r"""LaTeX tables as data: rows, cells, numbers, which cells are bold or underlined, where each cell is in the
+r"""LaTeX tables as data: rows, cells, numbers, which cells are bold, where each cell is in the
 source, and which way each column is better (from ↑/↓ marks or the metric's name).
 
 Handles tabular, tabular*, tabularx, longtable and array; \multicolumn and \multirow; booktabs rules and \hline
@@ -22,7 +22,6 @@ MAX_SPAN = 64  # \multicolumn{3000000}{c}{x} must not allocate millions of cells
 FULL_RULE = re.compile(r"\\(?:toprule|midrule|bottomrule|hline|specialrule|hdashline)\b")
 NUMBER = re.compile(r"(?<![\w.])[-−]?\d+(?:,\d{3})*(?:\.\d+)?(?![\w.])")
 BOLD = re.compile(r"\\(?:textbf|mathbf|boldsymbol|bm|pmb)\s*\{|\{\s*\\bf(?:series)?\b|\\bf(?:series)?\b|\\cellcolor\{best\}")
-UNDERLINE = re.compile(r"\\(?:underline|ul|uline)\s*\{")
 
 LOWER = re.compile(
     r"\b(?:err(?:or)?s?|loss|perplexity|ppl|fid|kid|wer|cer|ter|mse|mae|rmse|nll|bpd|bpc|eer|latency|time|runtime|"
@@ -54,8 +53,13 @@ class Cell:
     value: float | None
     decimals: int
     bold: bool
-    underline: bool
     line: int
+
+    @property
+    def num(self) -> float:
+        """The value of a cell known to hold a number (Table.column and the row helpers only return those)."""
+        assert self.value is not None, "not a number"
+        return self.value
 
 
 @dataclass
@@ -193,9 +197,9 @@ def _cells(row: str, offset: int, text: str) -> list[Cell]:
             raw = raw[m.end() : end if end > 0 else len(raw)]
         value, decimals, plain = parse_value(raw)
         line = text.count("\n", 0, offset + off + len(raw) - len(raw.lstrip())) + 1
-        c = Cell(raw.strip(), plain, value, decimals, bool(BOLD.search(raw)), bool(UNDERLINE.search(raw)), line)
+        c = Cell(raw.strip(), plain, value, decimals, bool(BOLD.search(raw)), line)
         cells.append(c)
-        cells.extend(Cell("", "", None, 0, False, False, line) for _ in range(span - 1))
+        cells.extend(Cell("", "", None, 0, False, line) for _ in range(span - 1))
     return cells
 
 

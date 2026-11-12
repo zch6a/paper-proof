@@ -13,6 +13,7 @@ import tempfile
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -92,10 +93,10 @@ class HttpTransport:
 
     def _get(self, url: str, host: str) -> Response:
         if self.mailto and host == "api.crossref.org":
-            url += ("&" if "?" in url else "?") + "mailto=" + urllib.request.quote(self.mailto)
+            url += ("&" if "?" in url else "?") + "mailto=" + urllib.parse.quote(self.mailto)
         # OpenAlex answers without a key, within a small daily budget; a free key (set by the user) raises it tenfold.
         if self.openalex_key and host == "api.openalex.org":
-            url += ("&" if "?" in url else "?") + "api_key=" + urllib.request.quote(self.openalex_key)
+            url += ("&" if "?" in url else "?") + "api_key=" + urllib.parse.quote(self.openalex_key)
         delay = 2.0
         last_error = ""
         for attempt in range(self.retries + 1):
