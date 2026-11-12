@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import argparse
 import sys
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from . import __version__, report
+from . import __version__, arxiv_source, report
 from .bib import BibError, parse_bib
 from .check import Reference, Verdict, check_reference, duplicates, reference_from_bib
 from .latex import find_main, parse_bbl, read_project
 from .numbers import check_numbers
-from .transport import CachedTransport, HttpTransport, ReplayTransport, Transport, default_cache_dir
+from .transport import CachedTransport, HttpTransport, ReplayTransport, Transport, TransportError, default_cache_dir
 
 FAIL_LEVELS = {"not-found": {"not-found", "retracted"}, "mismatch": {"not-found", "retracted", "mismatch"}, "never": set()}
 
@@ -26,7 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
         "nowhere in the paper, references to labels that do not exist.",
     )
     p.add_argument("--version", action="version", version=f"paper-proof {__version__}")
-    p.add_argument("bib", metavar="PAPER", help="a LaTeX project folder, its main .tex file, a .bib, or a compiled .bbl")
+    p.add_argument("bib", metavar="PAPER", help="a LaTeX project folder, its main .tex file, a .bib, a compiled .bbl, or an arXiv id (2106.09685)")
     p.add_argument("--format", choices=["text", "json", "md"], default="text", help="report format (default: text)")
     p.add_argument("--fail-on", choices=list(FAIL_LEVELS), default="not-found", help="exit 1 when there are references this bad (default: not-found)")
     p.add_argument("--jobs", type=int, default=4, help="references checked at once (default 4; each database is still asked politely)")
@@ -39,11 +40,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="what to check, comma-separated: refs (references, online), numbers (tables, claimed changes, abstract numbers, "
         "labels: offline, LaTeX only). Default: refs,numbers",
     )
-    p.add_argument("--offline", action="store_true", help="same as --checks numbers: nothing is sent anywhere")
+    p.add_argument("--offline", action="store_true", help="same as --checks numbers: the checks send nothing (an arXiv id is still fetched)")
     return p
 
 
-def run(argv: list[str] | None = None, transport: Transport | None = None) -> int:
+def run(argv: list[str] | None = None, transport: Transport | None = None, fetcher=None) -> int:
+    """`transport` and `fetcher` stand in for the network in tests."""
     args = build_parser().parse_args(argv)
     path = Path(args.bib)
     checks = {"numbers"} if args.offline else {c.strip() for c in args.checks.split(",") if c.strip()}
@@ -53,6 +55,24 @@ def run(argv: list[str] | None = None, transport: Transport | None = None) -> in
     if args.jobs < 1:
         print("paper-proof: --jobs must be at least 1", file=sys.stderr)
         return 2
+    if not path.exists() and arxiv_source.is_arxiv_id(args.bib):
+        # An arXiv id: its source into a temporary folder, checked, then deleted.
+        if transport is not None and fetcher is None:
+            print("paper-proof: an arXiv id needs the network", file=sys.stderr)
+            return 2
+        if args.format == "text":
+            print(f"fetching the LaTeX source of {args.bib} from arxiv.org (kept in a temporary folder, deleted afterwards)", file=sys.stderr)
+        with tempfile.TemporaryDirectory(prefix="paper-proof-") as tmp:
+            try:
+                (fetcher or arxiv_source.fetch)(args.bib, Path(tmp))
+            except (TransportError, ValueError) as e:
+                print(f"paper-proof: {e}", file=sys.stderr)
+                return 2
+            return _check(Path(tmp), args, checks, transport, f"arXiv:{args.bib}")
+    return _check(path, args, checks, transport, str(path))
+
+
+def _check(path: Path, args, checks: set[str], transport: Transport | None, source: str) -> int:
     try:
         refs, extra = load(path, need_refs="refs" in checks)
     except OSError as e:
@@ -83,7 +103,6 @@ def run(argv: list[str] | None = None, transport: Transport | None = None) -> in
     if progress:
         print("\r" + " " * 30 + "\r", end="", file=sys.stderr)
     dups = duplicates(refs)
-    source = str(path)
     if args.format == "json":
         print(report.to_json(verdicts, dups, source, extra))
     elif args.format == "md":
