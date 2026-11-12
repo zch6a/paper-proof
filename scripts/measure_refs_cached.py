@@ -1,7 +1,7 @@
-"""Reference checks on real papers from the answer cache only (no request is sent; a missing answer counts as no answer): how many references come out not-found or mismatched, so each
-one can be looked at by hand.
+"""Reference checks on real papers from the answer cache only: no request is sent, and an answer that is not
+cached counts as no answer. Re-scores the verdicts after a change to the matching, for free.
 
-    uv run python scripts/measure_refs.py SOURCES_DIR ID [ID ...] > refs-report.txt
+    uv run python scripts/measure_refs_cached.py SOURCES_DIR ID [ID ...]
 """
 
 import sys
@@ -11,7 +11,7 @@ from pathlib import Path
 
 from paper_proof.check import check_reference
 from paper_proof.latex import find_main, read_project
-from paper_proof.transport import CachedTransport, HttpTransport, default_cache_dir
+from paper_proof.transport import CachedTransport, default_cache_dir
 
 root = Path(sys.argv[1])
 
