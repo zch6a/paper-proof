@@ -197,6 +197,20 @@ def openalex_search(t: Transport, title: str) -> list[Record]:
     return [_openalex_record(w) for w in (data or {}).get("results", [])]
 
 
+def doi_exists(t: Transport, doi: str) -> bool:
+    """Whether a DOI is registered with any agency (Crossref, DataCite, ...), from doi.org's handle API: only
+    existence, no metadata. responseCode 1 means found, 100 not found."""
+    r = t.get(f"https://doi.org/api/handles/{_q(doi)}")
+    if r.status == 404:
+        return False
+    if r.status != 200:
+        raise TransportError(f"doi.org: HTTP {r.status}")
+    try:
+        return json.loads(r.text).get("responseCode") == 1
+    except ValueError as e:
+        raise TransportError("doi.org: unreadable answer") from e
+
+
 def openalex_text(t: Transport, text: str) -> list[Record]:
     """Relevance search over titles and abstracts, for a whole printed reference (the caller checks that a hit's
     title really is in the reference)."""

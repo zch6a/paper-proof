@@ -97,29 +97,63 @@ def title_in(title: str, text: str, share: float = 0.9) -> bool:
     return matched / len(t) >= share and span <= len(t) + 3
 
 
+# Letters NFKD does not take apart: Søraker, Łukasz, Straße, Æsir.
+_LATIN = str.maketrans(
+    {"ø": "o", "Ø": "O", "ł": "l", "Ł": "L", "ß": "ss", "æ": "ae", "Æ": "AE", "œ": "oe", "Œ": "OE", "đ": "d", "Đ": "D", "ı": "i", "þ": "th"}
+)
+# A record whose "author" is a group, not a person.
+ORGANIZATION = re.compile(
+    r"\b(?:workshop|team|consortium|collaboration|group|project|initiative|inc|ltd|lab|laboratory|foundation|committee|community)\b", re.I
+)
+
+
+def _name_words(name: str) -> list[str]:
+    return norm_text(name.translate(_LATIN)).split()
+
+
 def family(name: str) -> str:
     """A family name compared by its last word, without accents or case ('van Beethoven' ~ 'Beethoven').
 
-    >>> family("de la Fontaine") == family("Fontaine")
-    True
+    >>> family("de la Fontaine") == family("Fontaine"), family("Søraker") == family("Soraker")
+    (True, True)
     """
-    words = norm_text(name).split()
+    words = _name_words(name)
     return words[-1] if words else ""
+
+
+def same_person(cited: str, recorded: str) -> bool:
+    """Whether a cited family name belongs to a recorded full name, allowing for compound and particle names and
+    for a family name written first or last ('Ben-Zaken' / 'Elad Ben Zaken', 'El-Showk' / 'Sheer El Showk',
+    'Ali' / 'Mostofa Ali Patwary'), but not for a different name ('Ham' / 'Jihun Hamm').
+
+    >>> same_person("Zaken", "Elad Ben-Zaken"), same_person("El-Showk", "Sheer El Showk"), same_person("Ali", "Mostofa Ali Patwary")
+    (True, True, True)
+    >>> same_person("Ham", "Jihun Hamm"), same_person("Smith", "John Smithson")
+    (False, False)
+    """
+    c, r = _name_words(cited), _name_words(recorded)
+    if not c or not r:
+        return False
+    fam = c[-1]
+    joined = "".join(r)
+    if fam in r or "".join(c) in r:
+        return True
+    # compounds: the cited name is the end (Ben-Zaken -> benzaken) or several recorded words run together
+    return len(fam) >= 4 and (joined.endswith(fam) or "".join(c) == "".join(r[-len(c) :]) or "".join(c) in joined and len("".join(c)) >= 6)
 
 
 def author_overlap(cited: list[str], found: list[str]) -> tuple[float, bool]:
     """(share of cited family names that the record has, whether the first authors agree).
 
-    >>> author_overlap(["Vaswani", "Shazeer"], ["Vaswani", "Shazeer", "Parmar"])
+    >>> author_overlap(["Vaswani", "Shazeer"], ["Ashish Vaswani", "Noam Shazeer", "Niki Parmar"])
     (1.0, True)
     >>> author_overlap(["Smith"], ["Vaswani", "Smith"])
     (1.0, False)
     """
     if not cited or not found:
         return 0.0, False
-    have = {family(n) for n in found}
-    share = sum(1 for n in cited if family(n) in have) / len(cited)
-    return share, family(cited[0]) == family(found[0])
+    share = sum(1 for n in cited if any(same_person(n, f) for f in found)) / len(cited)
+    return share, same_person(cited[0], found[0])
 
 
 @dataclass
@@ -129,6 +163,7 @@ class Comparison:
     first_author: bool
     year_delta: int | None
     problems: list[str]
+    notes: list[str] = field(default_factory=list)
 
 
 def compare(title: str, cited_authors: list[str], year: int | None, rec: Record) -> Comparison:
@@ -137,15 +172,22 @@ def compare(title: str, cited_authors: list[str], year: int | None, rec: Record)
     share, first = author_overlap(cited_authors, rec.authors)
     delta = None if year is None or rec.year is None else year - rec.year
     problems: list[str] = []
+    notes: list[str] = []
     if cited_authors and rec.authors:
-        if not first:
+        if not first and not ORGANIZATION.search(rec.authors[0]) and not ORGANIZATION.search(cited_authors[0]):
             problems.append(f"first author is {rec.authors[0]}, not {cited_authors[0]}")
-        missing = [n for n in cited_authors if family(n) not in {family(x) for x in rec.authors}]
-        # A record with fewer authors than the citation is often just incomplete (book chapters, old papers):
-        # then the missing names are not evidence of a wrong citation.
-        if missing and len(rec.authors) >= len(cited_authors):
+        missing = [n for n in cited_authors if not any(same_person(n, x) for x in rec.authors)]
+        # A record with fewer authors than the citation is often just incomplete (book chapters, old papers), and in
+        # a long list one name is usually a spelling variant: report only what is clearly wrong.
+        clearly = len(missing) / len(cited_authors) >= 0.2 if len(cited_authors) > 5 else bool(missing)
+        if missing and clearly and len(rec.authors) >= len(cited_authors):
             problems.append(f"{'author' if len(missing) == 1 else 'authors'} not on the paper: {', '.join(missing[:4])}")
-    # One year off is common and fine (an arXiv version, a conference held the year after submission).
-    if delta is not None and abs(delta) > 1:
+        elif missing and len(rec.authors) >= len(cited_authors):
+            notes.append(f"not found in the record's author list (a spelling variant?): {', '.join(missing[:4])}")
+    # One year off is common and fine (an arXiv version, a conference held the year after submission). A later year
+    # than the record's is usually a later version, a journal version or a reprint: worth a note, not an error.
+    if delta is not None and delta < -1:
         problems.append(f"year is {rec.year}, not {year}")
-    return Comparison(title=t, authors=share, first_author=first, year_delta=delta, problems=problems)
+    elif delta is not None and delta > 1:
+        notes.append(f"{rec.source} dates it {rec.year}; cited as {year} (a later version or reprint?)")
+    return Comparison(title=t, authors=share, first_author=first, year_delta=delta, problems=problems, notes=notes)

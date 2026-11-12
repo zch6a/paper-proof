@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from paper_proof.bib import parse_bib  # noqa: E402
 from paper_proof.check import check_reference, reference_from_bib  # noqa: E402
-from paper_proof.transport import HttpTransport, Response, TransportError  # noqa: E402
+from paper_proof.transport import CachedTransport, HttpTransport, Response, TransportError, default_cache_dir  # noqa: E402
 
 
 class Recording:
@@ -36,7 +36,7 @@ class Recording:
 
 def main() -> None:
     bib = ROOT / "tests" / "fixtures" / "references.bib"
-    rec = Recording(HttpTransport())
+    rec = Recording(CachedTransport(HttpTransport(), default_cache_dir()))
     for e in parse_bib(bib.read_text(encoding="utf-8")):
         v = check_reference(reference_from_bib(e), rec)
         print(f"{v.key:24} {v.status:10} {'; '.join(v.problems + v.notes)[:120]}")

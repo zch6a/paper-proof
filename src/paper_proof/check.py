@@ -4,13 +4,14 @@ the bibliography says, and a verdict that never calls a reference missing when a
 
 from __future__ import annotations
 
+import dataclasses
 import re
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 
 from . import sources
 from .bib import Entry, authors, plain
-from .match import SAME_TITLE, Record, compare, norm_text, title_in, title_similarity
+from .match import SAME_TITLE, Record, author_overlap, compare, norm_text, title_in, title_similarity
 from .transport import Transport, TransportError
 
 # Entry types the bibliographic databases index. Others (software, web pages, manuals) are only checked when they
@@ -146,9 +147,10 @@ def _best(ref: Reference, records: list[Record]) -> tuple[Record | None, float]:
         # Between equally similar titles, the one with more of the cited authors.
         bonus = 0.0
         if ref.authors and r.authors:
-            from .match import author_overlap
-
             bonus = author_overlap(ref.authors, r.authors)[0] * 0.01
+        # and the one closest to the cited year (a conference version and its journal version share a title)
+        if ref.year and r.year:
+            bonus += 0.005 / (1 + abs(ref.year - r.year))
         if s + bonus > score:
             best, score = r, s + bonus
     return best, min(score, 1.0) if best else 0.0
@@ -167,9 +169,15 @@ def check_reference(ref: Reference, t: Transport) -> Verdict:
 
     errors: list[str] = []
     candidates: list[Record] = []
+    doi, arxiv = ref.doi, ref.arxiv
+    # arXiv's own DOIs (registered with DataCite, not Crossref) are arXiv ids
+    if m := re.match(r"10\.48550/arxiv\.(\d{4}\.\d{4,5})", doi or ""):
+        doi, arxiv = "", arxiv or m.group(1)
+    other_registry = False
 
-    # 1. Identifiers: exact lookups, and the identifier must point at the cited title.
-    for label, ident, lookup in (("DOI", ref.doi, sources.crossref_doi), ("arXiv id", ref.arxiv, sources.arxiv_id)):
+    # 1. Identifiers: exact lookups, and the identifier must point at the cited title. With an exact identifier, a
+    # slightly different title (one updated on arXiv, a subtitle added) is still the same work.
+    for label, ident, lookup in (("DOI", doi, sources.crossref_doi), ("arXiv id", arxiv, sources.arxiv_id)):
         if not ident:
             continue
         try:
@@ -177,13 +185,28 @@ def check_reference(ref: Reference, t: Transport) -> Verdict:
         except TransportError as e:
             errors.append(str(e))
             continue
+        if not found and label == "DOI":
+            # Not in Crossref: other agencies (DataCite: Zenodo, figshare, many datasets) register DOIs too.
+            try:
+                exists = sources.doi_exists(t, ident)
+            except TransportError as e:
+                errors.append(str(e))
+                continue
+            if exists:
+                other_registry = True
+                v.notes.append(f"DOI {ident} exists (registered outside Crossref: its details were not compared)")
+                continue
         if not found:
             v.problems.append(f"{label} {ident} does not exist")
             continue
         r = found[0]
-        if ref.title and title_similarity(ref.title, r.title) < SAME_TITLE:
+        sim = title_similarity(ref.title, r.title) if ref.title else 1.0
+        if sim < 0.8 and not shortened(ref, r):
             v.problems.append(f'{label} {ident} is a different work: "{r.title}"')
         else:
+            if sim < SAME_TITLE:
+                v.notes.append(f'the {label} {ident} has the title "{r.title}"')
+                r = dataclasses.replace(r, title=ref.title)  # same work: compare the rest
             candidates.append(r)
 
     # 2. The title, in each database until one has it.
@@ -199,7 +222,9 @@ def check_reference(ref: Reference, t: Transport) -> Verdict:
             answered.append(name)
             candidates.extend(found)
             best, score = _best(ref, candidates)
-            if score >= SAME_TITLE:
+            # Stop at the same title, unless the record's first author disagrees: another record of that title
+            # (a reprint, a namesake) may be the one cited ("A mathematical theory of communication").
+            if score >= SAME_TITLE and (not ref.authors or not best.authors or author_overlap(ref.authors, best.authors)[1]):
                 break
 
     # 2b. A reference read from a PDF, whose title may be cut wrong: the whole entry, matched by Crossref and
@@ -220,6 +245,10 @@ def check_reference(ref: Reference, t: Transport) -> Verdict:
                 break
         if score < SAME_TITLE and not ref.title:
             answered += ["crossref", "openalex"][:raw_answered]
+
+    if (best is None or score < SAME_TITLE) and other_registry:
+        v.status = "ok"  # the DOI exists; its registry has no record to compare with
+        return v
 
     if best is None or score < SAME_TITLE:
         if errors and not candidates:
@@ -247,6 +276,7 @@ def check_reference(ref: Reference, t: Transport) -> Verdict:
     v.match = best
     cmp = compare(ref.title, ref.authors, ref.year, best)
     v.problems.extend(cmp.problems)
+    v.notes.extend(cmp.notes)
     if ref.title and shortened(ref, best) and title_similarity(ref.title, best.title) < SAME_TITLE:
         v.notes.append(f'cited with a shortened title; the full title is "{best.title}"')
 

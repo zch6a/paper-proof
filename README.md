@@ -94,7 +94,13 @@ Measured with the scripts in [`scripts/`](scripts/) on the 50 papers of [`script
   labels inside macros and `\iftoggle` branches. Now: 7 errors and warnings, 7 real (the table above).
 - **Missed problems.** Errors injected into the same 50 papers (in memory) are found: a correct bold moved to a worse
   cell, **41 of 42**; a number of the abstract changed to one that is nowhere in the paper, **9 of 11**.
-- **References.** Recorded answers of the four databases drive the tests (no test reaches the network).
+- **References.** On the 264 references of five papers (Transformer, LoRA, DPO, LLaMA, Mistral), the first version
+  reported 23 mismatches, nearly all false: later versions cited with a later year, compound and transliterated
+  names, arXiv and Zenodo DOIs that Crossref does not hold, consortium authors. After the fixes: 4 mismatches, two of
+  them real (LoRA cites Jihun Hamm as "Ham"; DPO lists the wrong first author for "Dueling RL"). Recorded answers of
+  the databases drive the tests (no test reaches the network).
+- **PDFs.** Of the same papers' 372 references read from their PDFs, 323 titles come out exactly and 367 can be
+  matched (the whole printed entry is matched when the title cannot be cut out).
 
 What it will get wrong:
 - A convention it cannot see. When bold means something other than "best" and the caption does not say so, you get a

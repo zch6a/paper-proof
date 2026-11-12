@@ -34,7 +34,7 @@ def test_an_invented_reference_is_not_found():
 def test_wrong_year_wrong_first_author_wrong_doi():
     assert verdict("he2016_wrong_year").problems == ["year is 2015, not 2012"]
     v = verdict("wrong_first_author")
-    assert v.status == "mismatch" and any("first author is Kaiming He" in p for p in v.problems)
+    assert v.status == "mismatch" and any(p.startswith("first author is") and "He, not Simonyan" in p for p in v.problems)
     v = verdict("kingma2014_wrong_doi")
     assert v.status == "mismatch" and any("is a different work" in p for p in v.problems)
 
@@ -82,8 +82,21 @@ def test_one_database_down_still_finds_an_invented_reference():
     answers = {url: ((-1, "") if "semanticscholar" in url else a) for url, a in ANSWERS.items()}
     v = verdict("invented2023", answers)
     assert v.status == "not-found"
-    assert "no work with this title in OpenAlex, Crossref or arXiv" in v.problems
+    (msg,) = [p for p in v.problems if p.startswith("no work with this title in")]
+    assert "Semantic Scholar" not in msg and "Crossref" in msg and "arXiv" in msg  # only the databases that answered
     assert any(n.startswith("did not answer") for n in v.notes)
+
+
+def test_identifiers_outside_crossref():
+    # arXiv's DOI is an arXiv id; a Zenodo DOI exists although Crossref does not know it
+    assert verdict("brown2020_arxiv_doi").status == "ok"
+    v = verdict("eval_harness_zenodo")
+    assert v.status == "ok" and any("registered outside Crossref" in n for n in v.notes)
+
+
+def test_a_later_year_is_a_note_not_an_error():
+    v = verdict("adam_later_version")
+    assert v.status == "ok" and any("cited as 2017" in n for n in v.notes)
 
 
 def test_a_record_with_fewer_authors_is_not_evidence_against_the_citation():

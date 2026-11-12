@@ -28,6 +28,7 @@ MIN_INTERVAL = {
     "api.semanticscholar.org": 1.1,
     "api.crossref.org": 0.1,
     "api.openalex.org": 0.12,
+    "doi.org": 0.2,
 }
 
 
