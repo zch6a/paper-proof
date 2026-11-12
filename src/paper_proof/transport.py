@@ -59,11 +59,13 @@ class HttpTransport:
         self._lock = threading.Lock()
 
     def _pace(self, host: str) -> None:
+        # Reserve this request's slot under the lock, wait outside it: a pause for arXiv must not hold up OpenAlex.
         with self._lock:
-            wait = self._last.get(host, 0.0) + MIN_INTERVAL.get(host, 0.2) - time.monotonic()
-            if wait > 0:
-                time.sleep(wait)
-            self._last[host] = time.monotonic()
+            now = time.monotonic()
+            slot = max(now, self._last.get(host, 0.0) + MIN_INTERVAL.get(host, 0.2))
+            self._last[host] = slot
+        if slot > now:
+            time.sleep(slot - now)
 
     def get(self, url: str) -> Response:
         host = urlsplit(url).hostname or ""

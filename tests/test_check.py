@@ -77,6 +77,15 @@ def test_duplicates():
     assert duplicates(refs) == [("a", "b", "same title"), ("c", "d", "same DOI")]
 
 
+def test_one_database_down_still_finds_an_invented_reference():
+    # Semantic Scholar answering 429 is common without an API key; OpenAlex, Crossref and arXiv suffice.
+    answers = {url: ((-1, "") if "semanticscholar" in url else a) for url, a in ANSWERS.items()}
+    v = verdict("invented2023", answers)
+    assert v.status == "not-found"
+    assert "no work with this title in OpenAlex, Crossref or arXiv" in v.problems
+    assert any(n.startswith("did not answer") for n in v.notes)
+
+
 @pytest.mark.parametrize("key", sorted(REFS))
 def test_every_request_was_recorded(key):
     # A request the recording does not have would fail loudly: the tests can never reach the network.

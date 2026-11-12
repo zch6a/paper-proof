@@ -138,8 +138,19 @@ def _fields(body: str, macros: dict[str, str], line: int):
 # ---------------------------------------------------------------- LaTeX to plain text
 
 _ACCENTS = {
-    "'": "\u0301", "`": "\u0300", "^": "\u0302", '"': "\u0308", "~": "\u0303", "=": "\u0304", ".": "\u0307",
-    "u": "\u0306", "v": "\u030c", "H": "\u030b", "c": "\u0327", "k": "\u0328", "r": "\u030a",
+    "'": "\u0301",
+    "`": "\u0300",
+    "^": "\u0302",
+    '"': "\u0308",
+    "~": "\u0303",
+    "=": "\u0304",
+    ".": "\u0307",
+    "u": "\u0306",
+    "v": "\u030c",
+    "H": "\u030b",
+    "c": "\u0327",
+    "k": "\u0328",
+    "r": "\u030a",
 }
 _LETTERS = {"ss": "ß", "o": "ø", "O": "Ø", "ae": "æ", "AE": "Æ", "oe": "œ", "OE": "Œ", "aa": "å", "AA": "Å", "l": "ł", "L": "Ł", "i": "ı", "j": "ȷ"}
 _STYLE = re.compile(r"\\(?:emph|textbf|textit|texttt|textsc|textrm|textsf|mathrm|mathbf|mathit|mathcal|text|url|bf|it|em|sc|rm|tt)\b\s*")

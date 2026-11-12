@@ -98,6 +98,17 @@ TITLE_SEARCHES: list[tuple[str, Search]] = [
     ("crossref", lambda t, q: sources.crossref_search(t, q)),
     ("arxiv", sources.arxiv_search),
 ]
+DB_NAME = {"semanticscholar": "Semantic Scholar", "openalex": "OpenAlex", "crossref": "Crossref", "arxiv": "arXiv"}
+MIN_ANSWERED = 2
+
+
+def _listing(names: list[str]) -> str:
+    """'A', 'A or B', 'A, B or C'.
+
+    >>> _listing(["OpenAlex", "Crossref", "arXiv"])
+    'OpenAlex, Crossref or arXiv'
+    """
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " or " + names[-1]
 
 
 def _best(ref: Reference, records: list[Record]) -> tuple[Record | None, float]:
@@ -149,13 +160,15 @@ def check_reference(ref: Reference, t: Transport) -> Verdict:
 
     # 2. The title, in each database until one has it.
     best, score = _best(ref, candidates)
+    answered: list[str] = []
     if ref.title and score < SAME_TITLE:
-        for _name, search in TITLE_SEARCHES:
+        for name, search in TITLE_SEARCHES:
             try:
                 found = search(t, ref.title)
             except TransportError as e:
                 errors.append(str(e))
                 continue
+            answered.append(name)
             candidates.extend(found)
             best, score = _best(ref, candidates)
             if score >= SAME_TITLE:
@@ -168,13 +181,18 @@ def check_reference(ref: Reference, t: Transport) -> Verdict:
             return v
         if best is not None and score >= 0.75:
             v.closest = best.title
-        if errors:
+        # Two databases that answered and do not have it is enough to say so (Semantic Scholar often answers 429
+        # without an API key); with fewer, the honest answer is "unknown".
+        if errors and len(answered) < MIN_ANSWERED:
             v.status = "unknown"
             v.notes.append("not found in the databases that answered; others did not: " + "; ".join(sorted(set(errors))))
         else:
             v.status = "not-found"
+            if errors:
+                v.notes.append("did not answer: " + "; ".join(sorted(set(errors))))
         if ref.title:
-            v.problems.append("no work with this title in Semantic Scholar, OpenAlex, Crossref or arXiv")
+            names = answered or [n for n, _ in TITLE_SEARCHES]
+            v.problems.append("no work with this title in " + _listing([DB_NAME[n] for n in names]))
         return v
 
     v.match = best
