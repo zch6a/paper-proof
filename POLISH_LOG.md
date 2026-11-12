@@ -40,3 +40,5 @@
 
 - 社交预览图 docs/social-preview.png（scripts/social-card.html，无头 Chrome 渲染），终端内容是示例论文的真实输出（缩短）。
   示例论文里 Houlsby 的年份改成 2016：差一年在容忍范围内不报，原来写的 2018 演示不出“信息不符”。需要在仓库 Settings → Social preview 上传。
+- 首次运行：按 README 用 `uvx --from git+https://github.com/zch6a/paper-proof` 在全新的 uv 缓存下安装并运行，约 17 秒（之后走缓存），示例论文输出正确。
+- OpenAlex 不带 key 的每日额度今天已用完（一直 429）：熔断让这种情况下的运行不会变慢，结论落到“未知”或“其余数据库都没有”；README 已写明可设 `OPENALEX_API_KEY`。扩大参考文献测量改到额度恢复后。
