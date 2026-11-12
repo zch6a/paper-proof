@@ -1,6 +1,10 @@
 """PDF title extraction vs the paper's own LaTeX bibliography (offline comparison). PDFs are fetched into a
-temporary folder and deleted afterwards."""
+folder outside this repository (PAPER_PROOF_PDF_DIR, default: a temporary folder) and never committed.
 
+    uv run python scripts/measure_pdf.py SOURCES_DIR 1706.03762 2106.09685 ...
+"""
+
+import os
 import sys
 import tempfile
 import time
@@ -14,7 +18,7 @@ from paper_proof.pdf import references_from_pdf
 src = Path(sys.argv[1])
 UA = "paper-proof-dev/0.1 (+https://github.com/zch6a/paper-proof)"
 total = found = exact = 0
-tmp = Path(__file__).parent / "pdf_tmp"  # deleted when the measurements are done
+tmp = Path(os.environ.get("PAPER_PROOF_PDF_DIR") or tempfile.mkdtemp(prefix="paper-proof-pdfs-"))
 tmp.mkdir(exist_ok=True)
 if True:
     for aid in sys.argv[2:]:

@@ -8,3 +8,7 @@ build/
 *.egg-info/
 # the lookup cache (answers from Crossref, arXiv, ...): local only
 .paper-proof-cache/
+# papers fetched for measurements are the authors' work: never committed
+*.pdf
+scripts/pdf_tmp/
+arxiv_src/
