@@ -84,6 +84,21 @@ Accuracy goes from 70.1 to 71.3, a 5\% gain (Table~\ref{tab:mian})."""
     assert code == 1
 
 
+def test_offline_still_reports_undefined_citations(tmp_path, capsys):
+    assert run([str(project(tmp_path)), "--offline"], ReplayTransport({})) == 1
+    assert "\\cite{nokey}" in capsys.readouterr().out
+
+
+def test_a_paper_without_a_bibliography_still_gets_its_number_checks(tmp_path, capsys):
+    (tmp_path / "main.tex").write_text(
+        "\\documentclass{article}\\begin{document}See Table~\\ref{tab:x} and \\cite{a}.\\end{document}", encoding="utf-8"
+    )
+    code = run([str(tmp_path / "main.tex")], ReplayTransport({}))
+    out = capsys.readouterr().out
+    assert "no bibliography found" in out and "tab:x" in out and "\\cite{a}" not in out
+    assert code == 1  # the undefined \ref
+
+
 def test_nocite_star_checks_everything(tmp_path):
     root = project(tmp_path)
     (root / "main.tex").write_text(MAIN.replace(r"\bibliographystyle", r"\nocite{*}\bibliographystyle"), encoding="utf-8")

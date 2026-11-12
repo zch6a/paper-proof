@@ -72,7 +72,7 @@ def summary(verdicts: list[Verdict]) -> dict[str, int]:
 
 def _scope(extra: Extra, n: int) -> str:
     if not extra.refs_checked:
-        return f"main file {extra.main}, numbers and labels only (references not checked: offline)"
+        return f"main file {extra.main}, numbers, labels and citations (references not looked up: offline)"
     if not extra.main:
         return f"{n} reference{'' if n == 1 else 's'}"
     return f"{n} cited reference{'' if n == 1 else 's'} (main file {extra.main}, bibliography from {extra.bibliography_from})"

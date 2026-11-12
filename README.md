@@ -30,7 +30,7 @@ result of an earlier run. paper-proof finds them first. This is its real output 
 
 ```text
 $ paper-proof examples/paper --offline
-paper-proof 0.1.0 · examples/paper: main file main.tex, numbers and labels only (references not checked: offline)
+paper-proof 0.1.0 · examples/paper: main file main.tex, numbers, labels and citations (references not looked up: offline)
 
 The paper against itself:
 ERROR     main.tex:23  reference to tab:ablaton, which is never defined: it prints as ??
@@ -40,6 +40,8 @@ WARNING   main.tex:26  from 27.3 to 28.9 is a 5.9% relative change (1.6 points),
 WARNING   main.tex:28  this sentence points to tab:main and says 29.2 (the table has 28.9): a number the table does not show, nor as a difference or relative change of two of its numbers
 WARNING   main.tex:41  tab:main, BLEU \uparrow: 28.1 is bold but 28.9 (SMA-large (ours)) is higher
 note      never referred to in the text: tab:ablation
+
+Not cited anywhere in the text (not checked): unused2020
 
 Summary: 1 ERROR, 5 WARNINGS, 1 note
 ```

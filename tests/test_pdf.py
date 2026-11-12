@@ -100,6 +100,13 @@ def test_a_pdf_on_the_command_line_checks_only_references(tmp_path, capsys):
     assert data["findings"] == [] and code == 0
 
 
+def test_a_damaged_pdf_is_an_error_message(tmp_path, capsys):
+    bad = tmp_path / "bad.pdf"
+    bad.write_bytes(b"%PDF-1.4\n")
+    assert run([str(bad)], ReplayTransport({})) == 2
+    assert "cannot read this PDF" in capsys.readouterr().err
+
+
 class _down(dict):
     """Any URL: no answer."""
 

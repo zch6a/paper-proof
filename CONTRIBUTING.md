@@ -4,6 +4,16 @@ Thank you for helping. The most useful contributions are **false alarms and miss
 issue with the arXiv id (or a minimal LaTeX snippet), the line paper-proof reported or missed, and what it should
 have said.
 
+## Where things are
+
+| | |
+|---|---|
+| `bib.py`, `latex.py`, `pdf.py`, `arxiv_source.py` | reading the inputs: BibTeX, LaTeX projects (`\input`, citations, `.bbl`), PDFs, arXiv sources |
+| `tables.py` | LaTeX tables as data (rows, groups, numbers, bold, which way a column is better) |
+| `checks/` | the paper against itself, one module per check (`bold`, `changes`, `stale`, `averages`, `labels`; shared helpers in `common`); `numbers.py` runs them all |
+| `transport.py`, `sources.py`, `match.py`, `check.py` | the reference checks: polite HTTP and its cache, the four databases, comparing a reference with a record, the verdict |
+| `report.py`, `cli.py` | terminal, JSON and Markdown reports; the command line |
+
 ## Development
 
 ```bash

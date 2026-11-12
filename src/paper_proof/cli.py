@@ -12,7 +12,7 @@ from . import __version__, arxiv_source, report
 from .bib import BibError, parse_bib
 from .check import Reference, Verdict, check_reference, duplicates, reference_from_bib
 from .latex import find_main, parse_bbl, read_project, read_source
-from .numbers import check_numbers
+from .numbers import Finding, check_numbers
 from .transport import CachedTransport, HttpTransport, ReplayTransport, Transport, TransportError, default_cache_dir
 
 FAIL_LEVELS = {"not-found": {"not-found", "retracted"}, "mismatch": {"not-found", "retracted", "mismatch"}, "never": set()}
@@ -94,8 +94,20 @@ def _check(path: Path, args, checks: set[str], transport: Transport | None, sour
         return 2
     if "numbers" in checks and extra.texts:
         extra.findings = check_numbers(extra.texts)
+    if extra.main and not extra.bibliography_from:
+        extra.findings.append(
+            Finding(
+                "no-bibliography",
+                "note",
+                extra.main,
+                1,
+                "no bibliography found (no \\bibliography{...} or \\addbibresource{...} with an existing .bib file, no "
+                "thebibliography, no compiled .bbl next to the main file): citations and references were not checked",
+            )
+        )
     if "refs" not in checks:
-        refs, extra.undefined, extra.uncited = [], [], []
+        # Offline, references are not looked up; undefined citations need no network and are still reported.
+        refs = []
         extra.refs_checked = False
     if args.only:
         refs = [r for r in refs if r.key in set(args.only)]
@@ -151,7 +163,10 @@ def load(path: Path, need_refs: bool = True) -> tuple[list[Reference], report.Ex
     if suffix == ".pdf":
         from .pdf import references_from_pdf
 
-        refs = references_from_pdf(path)
+        try:
+            refs = references_from_pdf(path)
+        except Exception as e:  # pypdf raises many kinds of errors on damaged or encrypted files
+            raise InputError(f"cannot read this PDF ({e.__class__.__name__}: {str(e)[:120]})") from e
         if not refs and need_refs:
             raise InputError("no References section found in this PDF (a scanned PDF has no text to read)")
         return refs, extra
@@ -165,11 +180,9 @@ def load(path: Path, need_refs: bool = True) -> tuple[list[Reference], report.Ex
         extra.uncited = [r.key for r in proj.uncited()]
         extra.missing_files = proj.missing_files
         extra.texts = proj.texts
-        if not proj.references and need_refs:
-            raise InputError(
-                "no bibliography found: no \\bibliography{...} or \\addbibresource{...} with an existing .bib file, "
-                "no thebibliography environment, and no compiled .bbl next to the main file"
-            )
+        if not proj.references:
+            extra.undefined, extra.uncited = [], []  # without a bibliography every \cite would be "undefined"
+            return [], extra
         return proj.checked(), extra
     raise InputError("give a LaTeX project folder, a .tex, .bib, .bbl or .pdf file, or an arXiv id")
 

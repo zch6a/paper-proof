@@ -80,3 +80,9 @@
 - **代码结构**：numbers.py 涨到 650 行，按检查拆成 paper_proof/checks/ 下六个模块（common、bold、changes、stale、labels、averages，各 80–150 行），numbers.py 只留 check_numbers 和对外的名字（测试和测量脚本照旧能用）。用脚本按 AST 搬运，不手抄；拆完 50 篇论文的发现与注入检出完全一致。
 - **死代码**：删掉没用的 POINTS 正则、_numbers_in、表格单元的 underline 字段和 UNDERLINE 正则（下划线检查早已去掉）。
 - **类型**：mypy 第一次跑出 26 处。其中真问题：`urllib.request.quote` 不是公开接口（改用 urllib.parse.quote）；arxiv_source.fetch 遇到非法编号会在 None 上取 group（改为明确的 ValueError）；bib.py 一个变量先当整数后当匹配对象。其余是 Optional：给 Cell 加了断言过的 `num` 属性，已知是数字的格子都用它。现在 mypy 零问题，加入 dev 依赖和 CI。
+- **打包**：构建 wheel 确认新子包 checks/ 在里面（从 GitHub 安装不会缺模块）。
+- **对照 README 逐条实测**（fail-on 三档、--jobs 0、错误的 --checks、不存在的文件、没有 .tex 的文件夹、未知后缀、损坏的 PDF、空 .bib、没有参考文献的 .tex、非法 arXiv 号），发现三处并修好、各加测试：
+  1. 损坏的 PDF 直接抛 pypdf 的异常栈 → “cannot read this PDF (...)”，退出码 2。
+  2. 离线模式下未定义的 `\cite` 不报——它本来就不需要联网 → 离线也报。
+  3. 没有参考文献的 .tex 直接以退出码 2 结束，连数字检查都不做 → 照常做数字和标签检查，并加一条提示“没找到参考文献，引用没有检查”（这时也不把每个 `\cite` 都算成未定义）。
+- **文档**：CONTRIBUTING 加上源码结构表；README 离线输出块按新的说明文字重新生成。测试 116 个。
