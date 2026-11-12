@@ -16,8 +16,9 @@ text returned by public databases. Both are treated as untrusted.
   and bidirectional characters made visible, so they cannot move the terminal's cursor or rewrite its title. In the
   Markdown report, nothing renders: no links, images, HTML or @mentions.
 - **Sends little, and only where it says.** The reference checks send titles, DOIs and arXiv ids to Crossref,
-  arXiv, Semantic Scholar and OpenAlex over HTTPS, with a generic User-Agent; a contact address or an API key only if
-  you set `PAPER_PROOF_MAILTO` or `OPENALEX_API_KEY`. `--offline` sends nothing.
+  arXiv, Semantic Scholar and OpenAlex (and a DOI to doi.org when Crossref does not know it) over HTTPS, with a
+  generic User-Agent; a contact address or an API key only if you set `PAPER_PROOF_MAILTO` or `OPENALEX_API_KEY`.
+  `--offline` sends nothing, except fetching the source when the input is an arXiv id.
 - **The GitHub Action** needs only `contents: read`, runs the tool at the action's own ref (never code from the
   repository it checks), and passes inputs through environment variables, not into the script's text.
 - **One dependency** (pypdf), and the workflows pin their actions to commits and test with a read-only token.

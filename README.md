@@ -84,8 +84,8 @@ readers, and the kind a tool can rule out before submission.
 
 | | |
 |---|---|
-| **Exists** | looked up by DOI (Crossref) and arXiv id, then by title in Semantic Scholar, OpenAlex, Crossref and arXiv. Not found in at least two databases that answered: `NOT FOUND`, with the closest title if there is one |
-| **Matches** | title, first author, the other authors, year (±1), and a DOI or arXiv id that points to a different work: `MISMATCH` |
+| **Exists** | looked up by DOI (Crossref; a DOI Crossref does not hold, such as Zenodo's, is confirmed at doi.org) and arXiv id, then by title in Semantic Scholar, OpenAlex, Crossref and arXiv. Not found in at least two databases that answered: `NOT FOUND`, with the closest title if there is one |
+| **Matches** | title, first author, the other authors, the year, and a DOI or arXiv id that points to a different work: `MISMATCH`. A year more than one before the record's is an error; a later one is only a note (a later version, a journal version or a reprint) |
 | **Retracted** | the work is marked retracted in OpenAlex: `RETRACTED` |
 | **Published since** | cited as an arXiv preprint, but published at a venue: says where, so you can cite the final version |
 | **Duplicates** | two entries with the same DOI, arXiv id or title |
@@ -197,8 +197,10 @@ the skill folder into your agent's skills.
 ## Privacy and politeness
 
 - The number checks are offline. The reference checks send titles, DOIs and arXiv ids, nothing else, to Crossref,
-  arXiv, Semantic Scholar and OpenAlex, with a generic User-Agent, at the pace each service asks for (arXiv: one
-  request every 3 seconds), retrying politely on 429 and 5xx.
+  arXiv, Semantic Scholar and OpenAlex (and a DOI to doi.org when Crossref does not know it), with a generic
+  User-Agent, at the pace each service asks for (arXiv: one request every 3 seconds), retrying politely on 429 and
+  5xx; a database that keeps failing is left alone for the rest of the run. Given an arXiv id, paper-proof fetches
+  that paper's source from arxiv.org, even with `--offline`.
 - Answers are cached on disk (30 days), so re-running after an edit asks nobody again.
 - Optional: `PAPER_PROOF_MAILTO=you@example.org` gives Crossref a contact address (its "polite pool");
   `OPENALEX_API_KEY` raises OpenAlex's daily budget tenfold. Neither is needed or sent unless you set it.

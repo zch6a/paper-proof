@@ -80,8 +80,8 @@ Summary: 1 ERROR, 5 WARNINGS, 1 note
 
 | | |
 |---|---|
-| **存在** | 先按 DOI（Crossref）和 arXiv 号精确查，再按标题查 Semantic Scholar、OpenAlex、Crossref、arXiv。至少两个应答了的数据库都没有：`NOT FOUND`，并给出最接近的标题 |
-| **信息对得上** | 标题、第一作者、其他作者、年份（±1）、DOI 或 arXiv 号是否指向别的论文：`MISMATCH` |
+| **存在** | 先按 DOI（Crossref；Crossref 没有的 DOI，如 Zenodo 的，到 doi.org 确认）和 arXiv 号精确查，再按标题查 Semantic Scholar、OpenAlex、Crossref、arXiv。至少两个应答了的数据库都没有：`NOT FOUND`，并给出最接近的标题 |
+| **信息对得上** | 标题、第一作者、其他作者、年份、DOI 或 arXiv 号是否指向别的论文：`MISMATCH`。年份比记录早一年以上算错误；晚的只给提示（后来的版本、期刊版或重印） |
 | **已撤稿** | OpenAlex 标记为撤稿：`RETRACTED` |
 | **已正式发表** | 引的是 arXiv 预印本，其实已在某会议/期刊发表：给出出处，方便改引正式版 |
 | **重复** | DOI、arXiv 号或标题相同的两个条目 |
@@ -177,8 +177,9 @@ paper-proof，以及怎么解读结果（“未知”不是错误；关于加粗
 
 ## 隐私与礼貌
 
-- 数字检查完全离线。参考文献检查只把标题、DOI 和 arXiv 号发给 Crossref、arXiv、Semantic Scholar、OpenAlex，用通用的
-  User-Agent，按各服务要求的频率（arXiv 每 3 秒一次），遇到 429 和 5xx 礼貌重试。
+- 数字检查完全离线。参考文献检查只把标题、DOI 和 arXiv 号发给 Crossref、arXiv、Semantic Scholar、OpenAlex（Crossref 不认识的 DOI
+  再问 doi.org），用通用的 User-Agent，按各服务要求的频率（arXiv 每 3 秒一次），遇到 429 和 5xx 礼貌重试；一直失败的数据库本次运行就不再问。
+  给的是 arXiv 号时，即使加了 `--offline`，也会从 arxiv.org 取那篇论文的源码。
 - 应答缓存在本地（30 天），改完再跑不会重复请求。
 - 可选：`PAPER_PROOF_MAILTO=you@example.org` 给 Crossref 一个联系邮箱（进入它的 “polite pool”）；`OPENALEX_API_KEY` 让 OpenAlex 每日额度提高十倍。都不是必需的，不设就不会发送。
 - 不使用 DBLP：它现在对脚本请求返回机器人验证页，paper-proof 不绕过这类验证。
