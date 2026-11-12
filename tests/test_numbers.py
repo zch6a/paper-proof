@@ -53,9 +53,35 @@ d & \textbf{1.0} \\
 \end{tabular}"""
     (tab,) = find_tables(t)
     assert bold_not_best(tab) == []
-    bad = t.replace(r"\textbf{3.0}", "3.0").replace("c & 2.0", r"c & \textbf{2.0}")
+    bad = t.replace(r"\textbf{3.0}", "3.0").replace(r"\textbf{1.0}", "1.0").replace("c & 2.0", r"c & \textbf{2.0}")
     (tab,) = find_tables(bad)
-    assert len(bold_not_best(tab)) == 1
+    (f,) = bold_not_best(tab)
+    assert "neither the highest nor the lowest (they run from 1 to 3)" in f.message
+
+
+def test_several_bold_numbers_in_a_column_are_left_alone():
+    # Bold for the best single model and the best ensemble (BERT's SQuAD table does this), or for ties.
+    t = r"""\begin{tabular}{lc}
+\toprule Model & F1 \\ \midrule
+A & 88.5 \\ B (single) & \textbf{90.9} \\ C (ensemble) & \textbf{92.2} \\ D & 91.8 \\
+\bottomrule\end{tabular}"""
+    assert bold_not_best(find_tables(t)[0]) == []
+
+
+def test_a_caption_that_gives_bold_another_meaning():
+    t = r"""\begin{table}\caption{Results not significantly worse than the best are in bold.}\begin{tabular}{lc}
+Model & Acc \\ \hline A & 70.0 \\ B & \textbf{69.5} \\ C & 60.0 \\ \end{tabular}\end{table}"""
+    assert bold_not_best(find_tables(t)[0]) == []
+    assert len(bold_not_best(find_tables(t.replace("not significantly worse than the best are in bold", "Main results"))[0])) == 1
+
+
+def test_tables_with_models_in_columns_are_read_by_row():
+    t = r"""\begin{tabular}{lccc}
+\toprule Metric & GPT & OPT & Ours \\ \midrule
+Accuracy & 50 & \textbf{60} & 55 \\ F1 & 80 & 70 & \textbf{85} \\ BLEU & \textbf{65} & 90 & 95 \\ Recall & \textbf{70} & 40 & 30 \\
+\bottomrule\end{tabular}"""
+    (f,) = bold_not_best(find_tables(t)[0])
+    assert f.message == "table at :1, row BLEU: 65 is bold but 95 in the same row is higher"
 
 
 def test_parse_value():

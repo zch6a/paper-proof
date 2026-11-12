@@ -80,7 +80,12 @@ def text(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str,
     if extra.findings:
         out.append("The paper against itself:")
         for f in extra.findings:
-            out.append(f"{paint(FINDING_COLOR[f.severity], FINDING_LABEL[f.severity].ljust(9))} {visible(f.file)}:{f.line}  {visible(f.message)}")
+            if f.kind != "unreferenced":
+                out.append(f"{paint(FINDING_COLOR[f.severity], FINDING_LABEL[f.severity].ljust(9))} {visible(f.file)}:{f.line}  {visible(f.message)}")
+        unref = [f for f in extra.findings if f.kind == "unreferenced"]
+        if unref:
+            names = ", ".join(visible(f.message.split(" ")[1]) for f in unref[:10]) + (f" and {len(unref) - 10} more" if len(unref) > 10 else "")
+            out.append(f"{paint(FINDING_COLOR['note'], 'note'.ljust(9))} never referred to in the text: {names}")
         out.append("")
     if verdicts:
         out.append("References:")

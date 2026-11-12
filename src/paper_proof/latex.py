@@ -33,6 +33,39 @@ def strip_comments(text: str) -> str:
     return re.sub(r"(?<!\\)((?:\\\\)*)%[^\n]*", r"\1", text)
 
 
+def strip_dead(text: str) -> str:
+    r"""Text that never reaches the PDF blanked out, line breaks kept: \iffalse ... \fi (nested \if...\fi inside
+    counted) and comment environments.
+
+    >>> strip_dead("a \\iffalse b \\ifx c\\fi d \\fi e") == "a" + " " * 28 + "e"
+    True
+    >>> strip_dead("x\n\\begin{comment}\ny\n\\end{comment}\nz")
+    'x\n               \n \n             \nz'
+    """
+    blank = lambda s: re.sub(r"[^\n]", " ", s)  # noqa: E731
+    text = re.sub(r"\\begin\{comment\}.*?\\end\{comment\}", lambda m: blank(m.group(0)), text, flags=re.S)
+    out, i = [], 0
+    for m in re.finditer(r"\\iffalse\b", text):
+        if m.start() < i:
+            continue
+        depth, j = 1, m.end()
+        for t in re.finditer(r"\\(if[a-zA-Z@]*|fi)\b", text[m.end() :]):
+            if t.group(1) == "fi":
+                depth -= 1
+            elif t.group(1) not in ("ifthenelse", "iftoggle"):
+                depth += 1
+            if depth == 0:
+                j = m.end() + t.end()
+                break
+        else:
+            j = len(text)
+        out.append(text[i : m.start()])
+        out.append(blank(text[m.start() : j]))
+        i = j
+    out.append(text[i:])
+    return "".join(out)
+
+
 def _line(text: str, pos: int) -> int:
     return text.count("\n", 0, pos) + 1
 
@@ -102,7 +135,7 @@ def read_project(main: Path) -> Project:
             return
         seen.add(path)
         proj.files.append(path)
-        text = strip_comments(path.read_text(encoding="utf-8", errors="replace"))
+        text = strip_dead(strip_comments(path.read_text(encoding="utf-8", errors="replace")))
         rel = path.relative_to(root).as_posix()
         proj.texts[rel] = text
         # Citations and \input in the order they appear, so "first cited at" follows the paper's reading order.

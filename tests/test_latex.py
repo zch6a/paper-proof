@@ -57,7 +57,7 @@ def test_command_line_on_a_project_checks_only_what_is_cited(tmp_path, capsys):
 
 def test_offline_checks_send_nothing_and_find_the_paper_against_itself(tmp_path, capsys):
     root = project(tmp_path)
-    table = r"""\begin{table}\begin{tabular}{lc}\toprule Model & Acc \\ \midrule A & \textbf{70.1} \\ B & 71.3 \\ \bottomrule
+    table = r"""\begin{table}\begin{tabular}{lc}\toprule Model & Acc \\ \midrule A & \textbf{70.1} \\ B & 71.3 \\ C & 65.0 \\ \bottomrule
 \end{tabular}\caption{Main}\label{tab:main}\end{table}
 Accuracy goes from 70.1 to 71.3, a 5\% gain (Table~\ref{tab:mian})."""
     (root / "sections" / "intro.tex").write_text(table, encoding="utf-8")

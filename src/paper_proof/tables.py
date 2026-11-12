@@ -36,6 +36,14 @@ HIGHER = re.compile(
 )
 
 
+# Rows that are not competitors: human performance, oracles and upper bounds, statistics of the data itself.
+REFERENCE_ROW = re.compile(
+    r"\s*(?:human|humans|oracle|upper[- ]?bound|lower[- ]?bound|ground[- ]?truth|gt\b|train(?:ing)?(?: set| data)?$|"
+    r"test(?: set| data)?$|val(?:idation)?(?: set)?$|real(?: data| images)?$|reference$|random(?: chance| guess)?$|chance$)",
+    re.I,
+)
+
+
 @dataclass
 class Cell:
     raw: str
@@ -58,10 +66,21 @@ class Table:
     header_rows: int = 0
 
     def column(self, j: int) -> list[tuple[int, Cell]]:
-        return [(i, r[j]) for i, r in enumerate(self.rows) if i >= self.header_rows and j < len(r) and r[j].value is not None]
+        """The numbers of column j, without header rows and reference rows (human, oracle, train/test statistics)."""
+        return [
+            (i, r[j]) for i, r in enumerate(self.rows) if i >= self.header_rows and j < len(r) and r[j].value is not None and not self.is_reference(i)
+        ]
+
+    def is_reference(self, i: int) -> bool:
+        return bool(REFERENCE_ROW.match(self.row_name(i)))
 
     def header(self, j: int) -> str:
         return " ".join(r[j].text for r in self.rows[: self.header_rows] if j < len(r)).strip()
+
+    def row_start(self, i: int) -> int:
+        """Index of the first cell after the row's name cells."""
+        r = self.rows[i]
+        return next((j for j, c in enumerate(r) if c.value is not None), len(r))
 
     def row_name(self, i: int) -> str:
         r = self.rows[i]
@@ -110,13 +129,14 @@ def parse_value(raw: str) -> tuple[float | None, int, str]:
     ((28.4, 1), (None, 0), (92.1, 1), (None, 0))
     """
     text = _strip_format(raw)
-    core = re.split(r"\\pm|±|\\,\\pm|\+/-|\(", text)[0]
-    core = re.sub(r"\^\S*|_\S*|[†‡*§¶]|\\(?:dagger|ddagger|ast|star)\b|\\textsuperscript\S*", "", core).strip()
-    core = re.sub(r"\s*%$", "", core)
-    m = re.fullmatch(r"[-−]?\d+(?:,\d{3})*(?:\.\d+)?", core)
+    # the number, then nothing, or only what decorates a number: ± spread, (delta), %, sub/superscripts, marks
+    m = re.match(r"\s*([-−]?\d+(?:,\d{3})*(?:\.\d+)?)", text)
     if not m:
         return None, 0, text
-    s = core.replace("−", "-").replace(",", "")
+    rest = text[m.end() :].strip()
+    if rest and not re.match(r"(?:\\[A-Za-z]+|[(\[±%^_*†‡§¶/]|\+/-|\+|−|-\s*\d)", rest):
+        return None, 0, text  # 125.0M, 50 epochs, 3B: not a result
+    s = m.group(1).replace("−", "-").replace(",", "")
     return float(s), len(s.split(".")[1]) if "." in s else 0, text
 
 

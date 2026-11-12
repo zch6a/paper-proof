@@ -40,38 +40,108 @@ def _tol(decimals: int) -> float:
 # ---------------------------------------------------------------- bold that is not best
 
 
+# Captions that give bold another meaning than "the best": statistical ties, "better than the baseline", per-category.
+OTHER_MEANING = re.compile(
+    r"significan|confidence|overlap|within (?:one|1|two|2)|\bties?\b|indistinguishable|standard (?:error|deviation)|"
+    r"top[- ]?(?:2|3|two|three|k)\b|best (?:two|three)|(?:bold|highlight)\w*[^.]{0,60}(?:better|outperform|exceed|improv|above|beat|surpass)",
+    re.I,
+)
+
+
 def bold_not_best(t: Table) -> list[Finding]:
+    """A bold number that is the only bold one in its column (within its group of rows), yet is not the best in its
+    column, its group, or its row. Several bold numbers in one column are left alone: authors mark ties, the best of
+    each category, or every result above a baseline, and the table cannot tell which."""
+    if OTHER_MEANING.search(t.caption):
+        return []
+    headers = " ".join(c.text for r in t.rows[: t.header_rows] for c in r)
+    if re.search(r"\\Delta|Δ|\bdiff\b|\bgain\b", headers, re.I):
+        return []  # a pairwise comparison: bold marks the winner of each pair, not the best of a column
+    if _row_oriented(t):
+        return _bold_not_best_by_row(t)
     out = []
     ncols = max((len(r) for r in t.rows), default=0)
     for j in range(ncols):
         col = t.column(j)
-        if len(col) < 2:
+        if len(col) < 3:
             continue
-        for mark, attr in (("bold", "bold"), ("underlined", "underline")):
-            marked = [(i, c) for i, c in col if getattr(c, attr)]
-            if not marked or len(marked) == len(col):
+        want = _want(t, j)
+        bolds = [(i, c) for i, c in col if c.bold]
+        if not bolds or len(bolds) == len(col):
+            continue
+        for i, c in bolds:
+            group = [(k, d) for k, d in col if t.groups[k] == t.groups[i]]
+            if sum(1 for _, d in group if d.bold) > 1:
                 continue
-            want = direction(t.header(j))
-            for i, c in marked:
-                group = [(k, d) for k, d in col if t.groups[k] == t.groups[i]]
-                if attr == "bold":
-                    if _is_best(c.value, [d for _, d in col], want) or _is_best(c.value, [d for _, d in group], want):
-                        continue
-                else:
-                    # underlined usually means second best: allow the best and the second best
-                    if _is_rank(c.value, [d for _, d in col], want, 2) or _is_rank(c.value, [d for _, d in group], want, 2):
-                        continue
-                better = _better(c.value, [(k, d) for k, d in col], want)
-                k, d = better
-                header = t.header(j) or f"column {j + 1}"
-                way = {"higher": "higher", "lower": "lower"}.get(want, "better")
-                if mark == "underlined":
-                    what = f"{c.text} is underlined but is not among the two best"
-                else:
-                    what = f"{c.text} is bold but {d.text} ({t.row_name(k) or 'row ' + str(k + 1)}) is {way}"
-                if not want:
-                    what += " (and it is neither the highest nor the lowest)"
-                out.append(Finding("bold-not-best", "warning", t.file, c.line, f"{t.name}, {header}: {what}"))
+            if _is_best(c.value, [d for _, d in col], want) or (len(group) > 1 and _is_best(c.value, [d for _, d in group], want)):
+                continue
+            k, d = _better(c.value, group if len(group) > 2 else col, want)
+            header = t.header(j) or f"column {j + 1}"
+            if want:
+                what = f"{_shown(c)} is bold but {_shown(d)} ({t.row_name(k) or 'row ' + str(k + 1)}) is {want}"
+            else:
+                values = [x.value for _, x in (group if len(group) > 2 else col)]
+                what = f"{_shown(c)} is bold but is neither the highest nor the lowest (they run from {min(values):g} to {max(values):g})"
+            out.append(Finding("bold-not-best", "warning", t.file, c.line, f"{t.name}, {header}: {what}"))
+    return out
+
+
+def _row_cells(t: Table, i: int) -> list:
+    return [] if t.is_reference(i) else [d for d in t.rows[i][t.row_start(i) :] if d.value is not None]
+
+
+def _row_oriented(t: Table) -> bool:
+    """Bold marks the best of each row (models in columns, datasets or metrics in rows) more often than of each column."""
+    by_row = by_col = 0
+    for i, r in enumerate(t.rows[t.header_rows :], t.header_rows):
+        for j, c in enumerate(r):
+            if not c.bold or c.value is None:
+                continue
+            row = _row_cells(t, i)
+            col = [d for _, d in t.column(j)]
+            group = [d for k, d in t.column(j) if t.groups[k] == t.groups[i]]
+            by_row += len(row) > 2 and _is_best(c.value, row, direction(t.row_name(i)))
+            by_col += len(col) > 2 and (_is_best(c.value, col, _want(t, j)) or (len(group) > 1 and _is_best(c.value, group, _want(t, j))))
+    return by_row > by_col
+
+
+def _want(t: Table, j: int) -> str:
+    """Which way column j is better: its header, else what the caption says for the whole table."""
+    return direction(t.header(j)) or caption_direction(t.caption)
+
+
+def caption_direction(caption: str) -> str:
+    """>>> caption_direction("GLUE results. Higher is better for all metrics.")
+    'higher'
+    """
+    hi = re.search(r"higher (?:is|=) better|higher values? (?:is|are) better|\(higher is better\)", caption, re.I)
+    lo = re.search(r"lower (?:is|=) better|lower values? (?:is|are) better|\(lower is better\)", caption, re.I)
+    return "higher" if hi and not lo else "lower" if lo and not hi else ""
+
+
+def _shown(c) -> str:
+    return f"{c.value:.{c.decimals}f}"
+
+
+def _bold_not_best_by_row(t: Table) -> list[Finding]:
+    out = []
+    for i in range(t.header_rows, len(t.rows)):
+        row = _row_cells(t, i)
+        bolds = [c for c in row if c.bold]
+        if len(row) < 3 or len(bolds) != 1:
+            continue
+        c = bolds[0]
+        want = direction(t.row_name(i)) or caption_direction(t.caption)
+        if _is_best(c.value, row, want):
+            continue
+        name = t.row_name(i) or f"row {i + 1}"
+        values = [x.value for x in row]
+        if want:
+            best = max(values) if want == "higher" else min(values)
+            what = f"{_shown(c)} is bold but {best:g} in the same row is {want}"
+        else:
+            what = f"{_shown(c)} is bold but is neither the highest nor the lowest of its row ({min(values):g} to {max(values):g})"
+        out.append(Finding("bold-not-best", "warning", t.file, c.line, f"{t.name}, row {name}: {what}"))
     return out
 
 
@@ -84,17 +154,6 @@ def _is_best(v: float, cells, want: str) -> bool:
     if want == "lower":
         return v <= lo + tol
     return v >= hi - tol or v <= lo + tol
-
-
-def _is_rank(v: float, cells, want: str, n: int) -> bool:
-    values = sorted({c.value for c in cells})
-    tol = max((_tol(c.decimals) for c in cells), default=0)
-    top_hi, top_lo = values[-n:], values[:n]
-    if want == "higher":
-        return any(abs(v - x) <= tol for x in top_hi)
-    if want == "lower":
-        return any(abs(v - x) <= tol for x in top_lo)
-    return any(abs(v - x) <= tol for x in top_hi + top_lo)
 
 
 def _better(v: float, col, want: str):
@@ -125,19 +184,34 @@ def _interval(f, a: float, ea: float, b: float, eb: float) -> tuple[float, float
     return (min(vals), max(vals)) if vals else (float("-inf"), float("inf"))
 
 
+CHANGE_WORD = re.compile(
+    r"improv|increas|reduc|decreas|gain|boost|drop|lower|rais|cut|faster|speed|slower|relative|absolute|better|worse|"
+    r"jump|rise|rose|fell|fall|declin|halv|doubl|accelerat|outperform|shrink|grow|grew",
+    re.I,
+)
+WINDOW = 80  # characters between "from A to B" and the claimed change
+
+
+def _is_year(s: str) -> bool:
+    return "." not in s and 1900 <= int(s) <= 2100
+
+
 def change_claims(text: str, file: str, line_of) -> list[Finding]:
+    """`from A to B` with a percentage or a factor right next to it (within one clause, with a word of change)."""
     out = []
     for m in FROM_TO.finditer(text):
         a_s, b_s = m.group(1), m.group(2)
         a, b = float(a_s), float(b_s)
-        if a == b:
+        if a == b or _is_year(a_s) or _is_year(b_s):
             continue
-        # the sentence around it
-        start = max(text.rfind(". ", 0, m.start()), text.rfind("\n\n", 0, m.start())) + 1
-        end_candidates = [x for x in (text.find(". ", m.end()), text.find("\n\n", m.end())) if x >= 0]
-        end = min(end_candidates) if end_candidates else len(text)
-        sentence = text[start:end]
-        rest = sentence.replace(m.group(0), " ")
+        # the text right around it, not crossing a sentence or a semicolon
+        lo = max(m.start() - WINDOW, max(text.rfind(x, 0, m.start()) for x in (". ", ";", "\n\n")) + 1)
+        stops = [x for x in (text.find(". ", m.end()), text.find(";", m.end()), text.find("\n\n", m.end())) if x >= 0]
+        hi = min([m.end() + WINDOW] + stops)
+        start, sentence = lo, text[lo:hi]
+        if not CHANGE_WORD.search(sentence):
+            continue
+        rest = sentence.replace(m.group(0), " " * len(m.group(0)))
         ea, eb = _tol(_dec(a_s)), _tol(_dec(b_s))
         rel = _interval(lambda x, y: abs(y - x) / abs(x) * 100, a, ea, b, eb)
         pts = (abs(b - a) - ea - eb, abs(b - a) + ea + eb)
@@ -250,38 +324,84 @@ def _derived(x: float, ex: float, columns, percent: bool) -> bool:
 
 # ---------------------------------------------------------------- labels and references
 
-REF = re.compile(r"\\(?:ref|eqref|pageref|autoref|nameref|vref|Vref|cref|Cref|crefrange|Crefrange|cpageref|labelcref|subref)\*?\s*\{([^}]+)\}")
+REF = re.compile(r"\\(ref|eqref|pageref|autoref|nameref|vref|Vref|cref|Cref|crefrange|Crefrange|cpageref|Cpageref|labelcref|subref)\*?\s*\{([^}]+)\}")
 LABEL = re.compile(r"\\label\s*(?:\[[^\]]*\])?\s*\{([^}]+)\}")
 FLOAT = re.compile(r"\\begin\{(figure|table|figure\*|table\*|wrapfigure|wraptable|subfigure|subtable)\}")
+# Arguments of these are text that may be used once, several times, or not at all: a label inside one is not a
+# plain definition (a figure kept in a macro, two versions behind a toggle).
+CONDITIONAL = re.compile(
+    r"\\(?:newcommand|renewcommand|providecommand|DeclareRobustCommand|NewDocumentCommand|RenewDocumentCommand|newenvironment|"
+    r"iftoggle|ifthenelse|IfFileExists|ifdefined|ifcsname|ifboolexpr|ifbool|IfBooleanTF|def\s*\\[A-Za-z@]+[^{]*)\*?"
+)
+
+
+def refs_in(text: str):
+    """(key, position) of each reference; only the cleveref family takes comma-separated lists."""
+    for m in REF.finditer(text):
+        keys = m.group(2).split(",") if m.group(1).lower() in ("cref", "crefrange", "cpageref", "labelcref") else [m.group(2)]
+        for k in keys:
+            k = k.strip()
+            if k and "#" not in k:  # #1: a macro's parameter, not a label
+                yield k, m.start()
+
+
+def conditional_spans(text: str) -> list[tuple[int, int]]:
+    """Where text sits inside macro definitions or the branches of \\iftoggle, \\ifthenelse, \\if...\\fi."""
+    spans = []
+    for m in CONDITIONAL.finditer(text):
+        i = m.end()
+        start = None
+        for _ in range(4):  # up to four braced arguments
+            mm = re.match(r"\s*(?:\[[^\]]*\])?\s*\{", text[i:])
+            if not mm:
+                break
+            end = _matching(text, i + mm.end(), "{", "}")
+            if end < 0:
+                break
+            start = i + mm.end() if start is None else start
+            i = end + 1
+        if start is not None:
+            spans.append((start, i))
+    stack = []
+    for m in re.finditer(r"\\(if[a-zA-Z@]*|fi)\b", text):
+        name = m.group(1)
+        if name in ("ifthenelse", "iftoggle", "ifdefined", "ifcsname", "ifbool", "ifboolexpr"):
+            continue
+        if name == "fi":
+            if stack:
+                spans.append((stack.pop(), m.start()))
+        else:
+            stack.append(m.end())
+    return spans
 
 
 def labels(texts: dict[str, str]) -> list[Finding]:
-    defined: dict[str, tuple[str, int, str]] = {}
+    defined: dict[str, tuple[str, int, str, bool]] = {}
     out = []
-    used: set[str] = set()
-    for text in texts.values():
-        for m in REF.finditer(text):
-            for k in m.group(1).split(","):
-                used.add(k.strip())
+    used = {k for text in texts.values() for k, _ in refs_in(text)}
     for file, text in texts.items():
         floats = [(m.start(), m.group(1).rstrip("*"), text.find(f"\\end{{{m.group(1)}}}", m.start())) for m in FLOAT.finditer(text)]
+        spans = conditional_spans(text)
         for m in LABEL.finditer(text):
             k = m.group(1).strip()
+            if "#" in k:
+                continue
             line = text.count("\n", 0, m.start()) + 1
             kind = next((name for s, name, e in reversed(floats) if s < m.start() < (e if e >= 0 else len(text))), "")
+            conditional = any(s <= m.start() < e for s, e in spans)
             if k in defined:
-                f0, l0, _ = defined[k]
-                out.append(Finding("duplicate-label", "error", file, line, f"label {k} is also defined at {f0}:{l0}: references to it are ambiguous"))
+                f0, l0, _, cond0 = defined[k]
+                if not conditional and not cond0:
+                    msg = f"label {k} is also defined at {f0}:{l0}: references to it are ambiguous"
+                    out.append(Finding("duplicate-label", "error", file, line, msg))
                 continue
-            defined[k] = (file, line, kind)
+            defined[k] = (file, line, kind, conditional)
     for file, text in texts.items():
-        for m in REF.finditer(text):
-            for k in m.group(1).split(","):
-                k = k.strip()
-                if k and k not in defined:
-                    line = text.count("\n", 0, m.start()) + 1
-                    out.append(Finding("undefined-ref", "error", file, line, f"reference to {k}, which is never defined: it prints as ??"))
-    for k, (file, line, kind) in defined.items():
+        for k, pos in refs_in(text):
+            if k not in defined:
+                line = text.count("\n", 0, pos) + 1
+                out.append(Finding("undefined-ref", "error", file, line, f"reference to {k}, which is never defined: it prints as ??"))
+    for k, (file, line, kind, _) in defined.items():
         if kind in ("figure", "table", "wrapfigure", "wraptable") and k not in used:
             out.append(Finding("unreferenced", "note", file, line, f"{kind.replace('wrap', '')} {k} is never referred to in the text"))
     return out
