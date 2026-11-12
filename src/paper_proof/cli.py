@@ -188,4 +188,9 @@ def load(path: Path, need_refs: bool = True) -> tuple[list[Reference], report.Ex
 
 
 def main() -> None:
+    # The reports hold non-ASCII text (titles, names, zero-width spaces that break links in Markdown): a redirected
+    # stdout on Windows (cp1252) must not crash on them.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(run())
