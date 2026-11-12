@@ -70,3 +70,7 @@
   - 表头要整格是“平均”（“Avg doc len”“Mean Age”“Avg. # Turn”不是本行的平均）。
   - 第一版允许“最后几个数的平均”任取长度，行一长总能凑出来（Flan 两处注入没查出）→ 改为整张表投票选一个长度、每行都按它判。
   - 量检出：只在“平均列确实是简单平均”的表里注入（50 篇里只有 6 张），改动 0.5，6/6 查出；50 篇真实论文 0 误报。
+- **GitHub 上的实际渲染**：用 GitHub 自己的 Markdown 渲染接口（`gh api markdown`，GFM）渲染报告，标题里放链接、裸 URL、`<img onerror>`、@提及、粗体、反引号、竖线：
+  表格正常渲染，没有链接、图片、提及或 HTML（scripts/check_github_render.py 可复跑）。顺带修了“1 references”的单复数。
+- **演示图** docs/demo.png（scripts/render_demo.py）：真实的彩色终端输出转成 HTML 再用无头 Chrome 渲染，不截屏幕；放在 README 顶部，文字版收进折叠块。
+  - 做图时发现：环境里设了 NO_COLOR 时 FORCE_COLOR 不生效。改为显式的 FORCE_COLOR 优先，并加 `--color auto|always|never`（有测试）。

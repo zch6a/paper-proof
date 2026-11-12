@@ -33,8 +33,16 @@ def visible(s: str) -> str:
     return re.sub(r"[؜‎‏‪-‮⁦-⁩]", lambda m: f"<U+{ord(m.group(0)):04X}>", s)
 
 
-def use_color(stream=sys.stdout) -> bool:
-    return not os.environ.get("NO_COLOR") and (bool(os.environ.get("FORCE_COLOR")) or (hasattr(stream, "isatty") and stream.isatty()))
+def use_color(stream=sys.stdout, choice: str = "auto") -> bool:
+    """--color always/never decide; otherwise FORCE_COLOR (an explicit request) wins over NO_COLOR, which wins over
+    whether the output is a terminal."""
+    if choice in ("always", "never"):
+        return choice == "always"
+    if os.environ.get("FORCE_COLOR"):
+        return True
+    if os.environ.get("NO_COLOR"):
+        return False
+    return hasattr(stream, "isatty") and stream.isatty()
 
 
 @dataclass
@@ -66,8 +74,8 @@ def _scope(extra: Extra, n: int) -> str:
     if not extra.refs_checked:
         return f"main file {extra.main}, numbers and labels only (references not checked: offline)"
     if not extra.main:
-        return f"{n} references"
-    return f"{n} cited references (main file {extra.main}, bibliography from {extra.bibliography_from})"
+        return f"{n} reference{'' if n == 1 else 's'}"
+    return f"{n} cited reference{'' if n == 1 else 's'} (main file {extra.main}, bibliography from {extra.bibliography_from})"
 
 
 def text(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str, extra: Extra | None = None, color: bool = False) -> str:

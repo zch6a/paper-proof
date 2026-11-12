@@ -23,6 +23,11 @@ assistants), a year off by one, a bold number that is not the best in its column
 result of an earlier run. paper-proof finds them first. This is its real output on
 [the example paper](examples/paper/main.tex):
 
+<p align="center"><img src="docs/demo.png" alt="paper-proof's output on the example paper: an undefined label, a stale abstract number, a wrong percentage, a misplaced bold, an invented and a mistyped reference" width="900"></p>
+
+<details>
+<summary>The same, offline, as text</summary>
+
 ```text
 $ paper-proof examples/paper --offline
 paper-proof 0.1.0 · examples/paper: main file main.tex, numbers and labels only (references not checked: offline)
@@ -38,6 +43,8 @@ note      never referred to in the text: tab:ablation
 
 Summary: 1 ERROR, 5 WARNINGS, 1 note
 ```
+
+</details>
 
 ## It finds these in famous papers
 
@@ -148,6 +155,7 @@ paper-proof paper/ --format md     # a Markdown table, for a pull request or a r
 | `--only KEY` | check only these bibliography keys (repeatable) |
 | `--jobs 4` | references checked at once; each database keeps its own pace |
 | `--no-cache`, `--cache-dir` | answers are cached for 30 days, so a second run asks nobody again |
+| `--color auto` | `always`, `never`; by default colours only on a terminal (`FORCE_COLOR` and `NO_COLOR` are honoured) |
 
 Exit codes: 0 nothing at the `--fail-on` level, 1 something found, 2 the input could not be read.
 

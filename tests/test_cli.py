@@ -61,5 +61,16 @@ def test_bad_input_exits_2(capsys, tmp_path: Path):
     assert "line 1" in capsys.readouterr().err
 
 
+def test_colour_choice(monkeypatch, capsys):
+    monkeypatch.setenv("NO_COLOR", "1")
+    monkeypatch.delenv("FORCE_COLOR", raising=False)
+    assert not report.use_color()
+    assert report.use_color(choice="always")
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    assert report.use_color() and not report.use_color(choice="never")
+    run([BIB, "--only", "invented2023", "--color", "always"], replay())
+    assert "\x1b[31;1m" in capsys.readouterr().out
+
+
 def test_terminal_output_cannot_carry_escape_sequences():
     assert "\x1b" not in report.visible("title \x1b]0;pwned\x07 end")

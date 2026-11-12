@@ -20,6 +20,11 @@
 审稿人最容易抓到的往往是低级错误：引用了一篇根本不存在的论文（AI 写作助手常犯）、年份差一年、加粗的数字并不是那一列最好的、
 摘要里还留着上一版实验的结果。paper-proof 抢先把它们找出来。下面是它在[示例论文](examples/paper/main.tex)上的真实输出：
 
+<p align="center"><img src="docs/demo.png" alt="paper-proof 在示例论文上的输出：未定义的标签、过时的摘要数字、算错的百分比、加错的粗体、编造的和写错的参考文献" width="900"></p>
+
+<details>
+<summary>离线运行的同一输出（文字版）</summary>
+
 ```text
 $ paper-proof examples/paper --offline
 paper-proof 0.1.0 · examples/paper: main file main.tex, numbers and labels only (references not checked: offline)
@@ -35,6 +40,8 @@ note      never referred to in the text: tab:ablation
 
 Summary: 1 ERROR, 5 WARNINGS, 1 note
 ```
+
+</details>
 
 ## 在著名论文里也能查出问题
 
@@ -131,6 +138,7 @@ paper-proof paper/ --format md     # Markdown 表格，贴进 PR 或审稿意见
 | `--only KEY` | 只查这些条目（可重复） |
 | `--jobs 4` | 同时查几条；每个数据库仍按自己的节奏 |
 | `--no-cache`、`--cache-dir` | 应答缓存 30 天，第二次运行不再请求任何人 |
+| `--color auto` | 也可 `always`、`never`；默认只在终端里上色（认 `FORCE_COLOR` 和 `NO_COLOR`） |
 
 退出码：0 没有达到 `--fail-on` 级别的问题，1 发现问题，2 输入读不了。
 

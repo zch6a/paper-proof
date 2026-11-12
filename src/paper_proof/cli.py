@@ -50,6 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="what to check, comma-separated: refs (references, online), numbers (tables, claimed changes, abstract numbers, "
         "labels: offline, LaTeX only). Default: refs,numbers",
     )
+    p.add_argument("--color", choices=["auto", "always", "never"], default="auto", help="colours in the terminal report (default: auto)")
     p.add_argument("--offline", action="store_true", help="same as --checks numbers: the checks send nothing (an arXiv id is still fetched)")
     return p
 
@@ -118,7 +119,7 @@ def _check(path: Path, args, checks: set[str], transport: Transport | None, sour
     elif args.format == "md":
         print(report.markdown(verdicts, dups, source, extra))
     else:
-        print(report.text(verdicts, dups, source, extra, color=report.use_color()))
+        print(report.text(verdicts, dups, source, extra, color=report.use_color(choice=args.color)))
     return 1 if failed(args.fail_on, verdicts, extra) else 0
 
 
