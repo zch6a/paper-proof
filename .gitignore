@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+# the lookup cache (answers from Crossref, arXiv, ...): local only
+.paper-proof-cache/
