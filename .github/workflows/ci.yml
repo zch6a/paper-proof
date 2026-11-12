@@ -1,0 +1,48 @@
+name: CI
+on: [push, pull_request]
+# Read-only: tests need no write access.
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.10", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Actions pinned to commits; the token is not left in the checkout.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3; it has no moving major tag
+        with:
+          python-version: ${{ matrix.python }}
+      # The tests never reach the network: every database answer is recorded in tests/fixtures.
+      - run: uv run pytest -q
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+  # The action itself, on the example paper, offline.
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: proof
+        uses: ./
+        continue-on-error: true
+        with:
+          path: examples/paper
+          checks: numbers
+      - name: The example's planted problems are found
+        env:
+          REPORT: ${{ steps.proof.outputs.report }}
+        run: |
+          python3 - "$REPORT" <<'EOF'
+          import json, sys
+          kinds = {f["kind"] for f in json.load(open(sys.argv[1]))["findings"]}
+          assert {"bold-not-best", "wrong-change", "abstract-number", "undefined-ref"} <= kinds, kinds
+          print("found:", sorted(kinds))
+          EOF

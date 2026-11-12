@@ -47,6 +47,7 @@ class Extra:
     uncited: list[str] = field(default_factory=list)
     missing_files: list[str] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)  # the paper against itself (numbers, labels)
+    refs_checked: bool = True
     texts: dict[str, str] = field(default_factory=dict, repr=False)  # the project's sources, never written to a report
 
 
@@ -62,6 +63,8 @@ def summary(verdicts: list[Verdict]) -> dict[str, int]:
 
 
 def _scope(extra: Extra, n: int) -> str:
+    if not extra.refs_checked:
+        return f"main file {extra.main}, numbers and labels only (references not checked: offline)"
     if not extra.main:
         return f"{n} references"
     return f"{n} cited references (main file {extra.main}, bibliography from {extra.bibliography_from})"

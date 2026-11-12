@@ -116,6 +116,20 @@ A & 15.8 & 0.40 \\ B & 10.2 & 0.46 \\ C & 8.0 & 0.45 \\ D & 7.7 & 0.48 \\ Ours &
     assert "9.1 is bold but 7.7 (D) is lower" in f.message
 
 
+def test_two_claims_in_one_sentence_keep_their_own_numbers():
+    s = r"SMA improves BLEU from 27.3 to 28.9, a 9.5\% relative gain, and cuts training from 42 to 10 hours, a 4.2$\times$ speedup."
+    (f,) = change_claims(s, "a.tex", lines(s))
+    assert "from 27.3 to 28.9" in f.message and "not 9.5%" in f.message
+
+
+def test_abstract_differences_need_the_same_precision_and_unit():
+    paper = r"""\begin{abstract}We are 1.8 BLEU above the baseline and 4.2$\times$ faster.\end{abstract}
+\begin{tabular}{lcc}\toprule M & BLEU & Hours \\ \midrule A & 27.3 & 42 \\ B & 27.9 & 12 \\ C & 28.4 & 10 \\ \bottomrule\end{tabular}"""
+    msgs = [f.message for f in abstract_numbers({"m.tex": paper}, find_tables(paper, "m.tex"))]
+    # 1.8 is no difference of BLEU numbers (12 - 10 = 2 in whole hours does not count, nor 1.79% relative); 4.2 = 42/10
+    assert len(msgs) == 1 and "says 1.8," in msgs[0]
+
+
 def test_a_range_is_not_a_change():
     s = "the relative performance gain ranging from 33\\% to 90\\% and averaging 62\\%."
     assert change_claims(s, "a.tex", lines(s)) == []

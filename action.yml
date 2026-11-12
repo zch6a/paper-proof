@@ -1,0 +1,52 @@
+name: paper-proof
+description: Checks a LaTeX paper on every push. References exist and match; bold results are the best; claimed changes add up; abstract numbers are in the paper.
+author: zch6a
+branding:
+  icon: check-circle
+  color: green
+inputs:
+  path:
+    description: The LaTeX project folder, its main .tex file, or a .bib file (relative to the repository)
+    default: "."
+  checks:
+    description: '"refs,numbers" (default), "numbers" (offline: nothing is sent anywhere) or "refs"'
+    default: refs,numbers
+  fail-on:
+    description: '"not-found" (default: invented or retracted references, undefined citations and labels), "mismatch" (also wrong details and number warnings) or "never"'
+    default: not-found
+  openalex-api-key:
+    description: Optional free OpenAlex key, for a larger daily budget (pass it from a secret)
+    default: ""
+outputs:
+  report:
+    description: Path of the JSON report
+    value: ${{ steps.run.outputs.report }}
+runs:
+  using: composite
+  steps:
+    # The tool's own version, pinned by the ref of this action; nothing from the paper's repository is executed.
+    - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3; it has no moving major tag
+    # Database answers cached between runs: a second run asks nobody again.
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/paper-proof-cache
+        key: paper-proof-${{ hashFiles(format('{0}/**/*.bib', inputs.path), format('{0}/**/*.bbl', inputs.path)) }}
+        restore-keys: paper-proof-
+    - id: run
+      shell: bash
+      env:
+        PAPER: ${{ inputs.path }}
+        CHECKS: ${{ inputs.checks }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        OPENALEX_API_KEY: ${{ inputs.openalex-api-key }}
+        PAPER_PROOF_CACHE: ${{ runner.temp }}/paper-proof-cache
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        report="$RUNNER_TEMP/paper-proof.json"
+        set +e
+        uvx --from "$ACTION_PATH" paper-proof "$PAPER" --checks "$CHECKS" --fail-on never --format md >> "$GITHUB_STEP_SUMMARY"
+        uvx --from "$ACTION_PATH" paper-proof "$PAPER" --checks "$CHECKS" --fail-on "$FAIL_ON" --format json > "$report"
+        code=$?
+        set -e
+        echo "report=$report" >> "$GITHUB_OUTPUT"
+        exit $code

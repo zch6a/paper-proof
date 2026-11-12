@@ -1,0 +1,63 @@
+\documentclass{article}
+\usepackage{booktabs}
+\usepackage{natbib}
+\title{Sparse Mixture Adapters for Low-Resource Translation}
+\author{Anonymous}
+\begin{document}
+\maketitle
+
+% An example paper with planted problems, for trying paper-proof:
+%   paper-proof examples/paper            (references online, numbers offline)
+%   paper-proof examples/paper --offline  (numbers only: nothing is sent anywhere)
+
+\begin{abstract}
+We introduce sparse mixture adapters (SMA) for low-resource translation.
+SMA reaches 29.1 BLEU on WMT14 English--German, 1.8 BLEU above the Transformer baseline,
+while training 4.2$\times$ faster.
+\end{abstract}
+
+\section{Introduction}
+Attention-based models \citep{vaswani2017attention} and pre-trained encoders \citep{devlin2019bert}
+dominate translation. Adapters \citep{houlsby2019parameter} make fine-tuning cheap, and recursive
+gradient folding \citep{li2023recursive} has been proposed for the same purpose.
+Results are in Table~\ref{tab:main}; the ablation is in Table~\ref{tab:ablaton}.
+
+\section{Results}
+SMA improves BLEU from 27.3 to 28.9, a 9.5\% relative gain, and cuts training time from 42 to 10 hours,
+a 4.2$\times$ speedup.
+
+\begin{table}[t]
+\centering
+\caption{WMT14 English--German test set.}
+\label{tab:main}
+\begin{tabular}{lcc}
+\toprule
+Model & BLEU $\uparrow$ & Hours $\downarrow$ \\
+\midrule
+Transformer \citep{vaswani2017attention} & 27.3 & 42 \\
+Adapters \citep{houlsby2019parameter} & 27.9 & 18 \\
+LoRA & 28.4 & 12 \\
+SMA (ours) & \textbf{28.1} & \textbf{10} \\
+SMA-large (ours) & 28.9 & 14 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Ablation.}
+\label{tab:ablation}
+\begin{tabular}{lc}
+\toprule
+Variant & BLEU \\
+\midrule
+SMA & \textbf{28.9} \\
+without routing & 28.0 \\
+without sparsity & 27.6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+\end{document}

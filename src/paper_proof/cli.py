@@ -65,6 +65,7 @@ def run(argv: list[str] | None = None, transport: Transport | None = None) -> in
         extra.findings = check_numbers(extra.texts)
     if "refs" not in checks:
         refs, extra.undefined, extra.uncited = [], [], []
+        extra.refs_checked = False
     if args.only:
         refs = [r for r in refs if r.key in set(args.only)]
     if not refs:

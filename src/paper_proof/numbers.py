@@ -11,6 +11,7 @@ Every finding says where it is (file and line) and what it was compared with, so
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import asdict, dataclass
 
@@ -202,7 +203,7 @@ _NUM = r"(\d+(?:\.\d+)?)"
 FROM_TO = re.compile(r"\bfrom\s+\$?" + _NUM + r"\s*\$?\s*(?:\\?%|points?|pp)?\s+to\s+\$?" + _NUM + r"\s*\$?\s*(?:\\?%|points?|pp)?", re.I)
 PERCENT = re.compile(r"(?<![\d.])" + _NUM + r"\s*(?:\\%|%|percent\b)")
 POINTS = re.compile(r"(?<![\d.])" + _NUM + r"\s*(?:points?|pp|p\.p\.|absolute)\b", re.I)
-TIMES = re.compile(r"(?<![\d.])" + _NUM + r"\s*(?:\\times|×|x\b|-fold|times)", re.I)
+TIMES = re.compile(r"(?<![\d.])" + _NUM + r"\s*\$?\s*(?:\\times|×|x\b|-fold|times)", re.I)
 
 
 def _dec(s: str) -> int:
@@ -229,7 +230,8 @@ def _is_year(s: str) -> bool:
 def change_claims(text: str, file: str, line_of) -> list[Finding]:
     """`from A to B` with a percentage or a factor right next to it (within one clause, with a word of change)."""
     out = []
-    for m in FROM_TO.finditer(text):
+    claims = list(FROM_TO.finditer(text))
+    for n, m in enumerate(claims):
         a_s, b_s = m.group(1), m.group(2)
         a, b = float(a_s), float(b_s)
         if a == b or _is_year(a_s) or _is_year(b_s):
@@ -238,6 +240,15 @@ def change_claims(text: str, file: str, line_of) -> list[Finding]:
         lo = max(m.start() - WINDOW, max(text.rfind(x, 0, m.start()) for x in (". ", ";", "\n\n")) + 1)
         stops = [x for x in (text.find(". ", m.end()), text.find(";", m.end()), text.find("\n\n", m.end())) if x >= 0]
         hi = min([m.end() + WINDOW] + stops)
+        # never reach into the neighbouring "from ... to ..." claims: a change stated after a claim belongs to it
+        # ("from A to B, a p% gain"); one stated before it only when there is none after ("a p% gain, from A to B")
+        if n + 1 < len(claims):
+            hi = min(hi, claims[n + 1].start())
+        after = text[m.end() : hi]
+        if PERCENT.search(after) or TIMES.search(after):
+            lo = m.start()
+        elif n > 0:
+            lo = max(lo, claims[n - 1].end())
         start, sentence = lo, text[lo:hi]
         if not CHANGE_WORD.search(sentence):
             continue
@@ -329,7 +340,8 @@ def abstract_numbers(texts: dict[str, str], tables: list[Table]) -> list[Finding
         # a difference or a relative change is only expected where the abstract talks about one
         before = re.split(r"[.;,]\s", abstract[max(0, m.start() - 30) : m.start()])[-1]
         context = before + " " + re.split(r"[.;,]\s", abstract[m.end() : m.end() + 25])[0]
-        if DELTA_CONTEXT.search(context) and _derived(x, ex, columns, percent=bool(m.group(2))):
+        unit = "percent" if m.group(2) else "times" if re.match(r"\s*(?:\$?\\times|×|x\b|-fold|times)", abstract[m.end() :]) else "plain"
+        if DELTA_CONTEXT.search(context) and _derived(x, ex, columns, unit):
             continue
         line = text.count("\n", 0, start + m.start()) + 1
         out.append(
@@ -345,21 +357,26 @@ def abstract_numbers(texts: dict[str, str], tables: list[Table]) -> list[Finding
     return out
 
 
-def _derived(x: float, ex: float, columns, percent: bool) -> bool:
+def _derived(x: float, ex: float, columns, unit: str) -> bool:
+    """x as a difference (in points), a relative change (only for a percentage) or a ratio (only for "N×") of two
+    numbers of one table column. Differences only from columns at least as precise as x: 12 - 10 in a column of
+    whole hours says nothing about a claimed 1.8."""
+    need = round(-math.log10(ex * 2)) if ex > 0 else 0  # the decimals x is shown with
     for col in columns:
+        precise = min((c.decimals for c in col), default=0) >= need
         for c in col:
             for d in col:
                 if c is d or c.value is None or d.value is None:
                     continue
-                e = _tol(c.decimals) + _tol(d.decimals)
-                diff = abs(c.value - d.value)
-                if abs(diff - x) <= e + ex:
+                if unit == "times":
+                    if c.value > 0 and d.value > 0 and abs(c.value / d.value - x) <= ex + 0.01 * x:
+                        return True
+                    continue
+                if precise and abs(abs(c.value - d.value) - x) <= _tol(c.decimals) + _tol(d.decimals) + ex:
                     return True
-                if d.value:
+                if unit == "percent" and d.value:
                     lo, hi = _interval(lambda u, v: abs(v - u) / abs(u) * 100, d.value, _tol(d.decimals), c.value, _tol(c.decimals))
                     if lo - ex <= x <= hi + ex:
-                        return True
-                    if c.value > 0 and d.value > 0 and abs(c.value / d.value - x) <= ex + 0.01 * x:
                         return True
     return False
 

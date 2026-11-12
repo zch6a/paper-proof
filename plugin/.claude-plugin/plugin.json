@@ -1,0 +1,10 @@
+{
+  "name": "paper-proof",
+  "description": "Check a research paper before anyone else does: invented, retracted or wrong references; bold results that are not the best; claimed improvements that do not add up; abstract numbers found nowhere in the paper; broken labels.",
+  "version": "0.1.0",
+  "author": { "name": "zch6a" },
+  "homepage": "https://github.com/zch6a/paper-proof",
+  "repository": "https://github.com/zch6a/paper-proof",
+  "license": "MIT",
+  "keywords": ["research", "latex", "citations", "references", "academic", "papers", "claude-code"]
+}
