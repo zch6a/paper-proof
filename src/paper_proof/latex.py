@@ -252,14 +252,7 @@ def _bibitem(key: str, body: str, line: int, filename: str) -> Reference:
     title = re.sub(r"[.,;:\s]+$", "", title)
     years = YEAR.findall(author_part) or YEAR.findall(plain(raw))
     year = int(years[0] if YEAR.findall(author_part) else years[-1]) if years else None
-    names = YEAR.sub("", author_part)
-    names = re.sub(r"\(\s*\)|\bet al\.?|\bothers\b|\(eds?\.\)|\beds?\.", "", names)
-    families = []
-    for part in re.split(r"\s*,\s*and\s+|\s+and\s+|\s*&\s*|\s*,\s*|\s*;\s*", names.strip(" .,")):
-        part = part.strip(" .")
-        if not part or re.fullmatch(r"(?:[A-Z]\.?\s*-?\s*)+", part):
-            continue
-        families.append(part.split()[-1])
+    families = family_names(author_part)
     preprint = bool(arx) and not re.search(r"\bIn\b", venue) and bool(re.search(r"arXiv|CoRR", venue + " " + title, re.I))
     kind = "misc" if (url and not doi and not arx and not VENUE_WORDS.search(venue)) else ""
     return Reference(
@@ -275,6 +268,24 @@ def _bibitem(key: str, body: str, line: int, filename: str) -> Reference:
         cited_as_preprint=preprint,
         file=filename,
     )
+
+
+def family_names(author_part: str) -> list[str]:
+    """Family names from an author list as printed: "Ashish Vaswani, Noam Shazeer, and Niki Parmar",
+    "Vaswani, A., Shazeer, N.", "K. He and J. Sun" (initials and "et al." dropped).
+
+    >>> family_names("Vaswani, A., Shazeer, N., and Parmar, N. 2017")
+    ['Vaswani', 'Shazeer', 'Parmar']
+    """
+    names = YEAR.sub("", author_part)
+    names = re.sub(r"\(\s*\)|\bet al\.?|\bothers\b|\(eds?\.\)|\beds?\.", "", names)
+    families = []
+    for part in re.split(r"\s*,\s*and\s+|\s+and\s+|\s*&\s*|\s*,\s*|\s*;\s*", names.strip(" .,")):
+        part = part.strip(" .")
+        if not part or re.fullmatch(r"(?:[A-Z]\.?\s*-?\s*)+", part):
+            continue
+        families.append(part.split()[-1])
+    return families
 
 
 def _field(body: str, name: str) -> str:

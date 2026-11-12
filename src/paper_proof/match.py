@@ -35,9 +35,12 @@ def norm_text(s: str) -> str:
     'attention is all you need'
     >>> norm_text("Gödel–Escher: Bach")
     'godel escher bach'
+    >>> norm_text("Pre-training") == norm_text("Pretraining")  # hyphenation varies, and PDFs break words with it
+    True
     """
     s = unicodedata.normalize("NFKD", s)
     s = "".join(c for c in s if not unicodedata.combining(c)).casefold()
+    s = re.sub(r"(?<=[^\W\d_])[-‐](?=[^\W\d_])", "", s)
     s = re.sub(r"[^\w\s]|_", " ", s)
     return re.sub(r"\s+", " ", s).strip()
 
@@ -71,6 +74,27 @@ def title_similarity(a: str, b: str) -> float:
 
 
 SAME_TITLE = 0.92
+
+
+def title_in(title: str, text: str, share: float = 0.9) -> bool:
+    """Whether a title appears, in order and nearly whole, inside a longer printed reference.
+
+    >>> title_in("Attention is All you Need", "A. Vaswani et al. Attention is all you need. In NeurIPS, 2017.")
+    True
+    >>> title_in("Attention is not all you need", "A. Vaswani et al. Attention is all you need. In NeurIPS, 2017.")
+    False
+    """
+    t, s = norm_text(title).split(), norm_text(text).split()
+    if len(t) < 2:
+        return False
+    sm = SequenceMatcher(None, t, s, autojunk=False)
+    blocks = [b for b in sm.get_matching_blocks() if b.size]
+    if not blocks:
+        return False
+    matched = sum(b.size for b in blocks)
+    # the matched words must sit together in the reference, not be scattered over it
+    span = blocks[-1].b + blocks[-1].size - blocks[0].b
+    return matched / len(t) >= share and span <= len(t) + 3
 
 
 def family(name: str) -> str:

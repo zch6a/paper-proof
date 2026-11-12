@@ -27,7 +27,11 @@ def build_parser() -> argparse.ArgumentParser:
         "nowhere in the paper, references to labels that do not exist.",
     )
     p.add_argument("--version", action="version", version=f"paper-proof {__version__}")
-    p.add_argument("bib", metavar="PAPER", help="a LaTeX project folder, its main .tex file, a .bib, a compiled .bbl, or an arXiv id (2106.09685)")
+    p.add_argument(
+        "bib",
+        metavar="PAPER",
+        help="a LaTeX project folder, its main .tex file, a .bib, a compiled .bbl, a PDF (references only), or an arXiv id (2106.09685)",
+    )
     p.add_argument("--format", choices=["text", "json", "md"], default="text", help="report format (default: text)")
     p.add_argument("--fail-on", choices=list(FAIL_LEVELS), default="not-found", help="exit 1 when there are references this bad (default: not-found)")
     p.add_argument("--jobs", type=int, default=4, help="references checked at once (default 4; each database is still asked politely)")
@@ -137,6 +141,13 @@ def load(path: Path, need_refs: bool = True) -> tuple[list[Reference], report.Ex
         for e in parse_bib(path.read_text(encoding="utf-8-sig")):
             refs.append(reference_from_bib(e))
         return refs, extra
+    if suffix == ".pdf":
+        from .pdf import references_from_pdf
+
+        refs = references_from_pdf(path)
+        if not refs and need_refs:
+            raise InputError("no References section found in this PDF (a scanned PDF has no text to read)")
+        return refs, extra
     if suffix == ".bbl":
         return parse_bbl(path.read_text(encoding="utf-8", errors="replace"), path.name), extra
     if suffix == ".tex":
@@ -153,7 +164,7 @@ def load(path: Path, need_refs: bool = True) -> tuple[list[Reference], report.Ex
                 "no thebibliography environment, and no compiled .bbl next to the main file"
             )
         return proj.checked(), extra
-    raise InputError("give a .bib, .bbl or .tex file, or a LaTeX project folder")
+    raise InputError("give a LaTeX project folder, a .tex, .bib, .bbl or .pdf file, or an arXiv id")
 
 
 def main() -> None:

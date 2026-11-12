@@ -197,6 +197,14 @@ def openalex_search(t: Transport, title: str) -> list[Record]:
     return [_openalex_record(w) for w in (data or {}).get("results", [])]
 
 
+def openalex_text(t: Transport, text: str) -> list[Record]:
+    """Relevance search over titles and abstracts, for a whole printed reference (the caller checks that a hit's
+    title really is in the reference)."""
+    clean = re.sub(r"[,|:()\[\]\"“”]", " ", text)[:300]
+    data = _json(t, f"https://api.openalex.org/works?search={_q(clean)}&per-page=5")
+    return [_openalex_record(w) for w in (data or {}).get("results", [])]
+
+
 def openalex_doi(t: Transport, doi: str) -> list[Record]:
     data = _json(t, f"https://api.openalex.org/works/doi:{_q(doi)}")
     return [_openalex_record(data)] if data else []

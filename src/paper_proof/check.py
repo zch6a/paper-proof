@@ -10,7 +10,7 @@ from dataclasses import asdict, dataclass, field
 
 from . import sources
 from .bib import Entry, authors, plain
-from .match import SAME_TITLE, Record, compare, norm_text, title_similarity
+from .match import SAME_TITLE, Record, compare, norm_text, title_in, title_similarity
 from .transport import Transport, TransportError
 
 # Entry types the bibliographic databases index. Others (software, web pages, manuals) are only checked when they
@@ -31,6 +31,7 @@ class Reference:
     line: int = 0
     cited_as_preprint: bool = False
     file: str = ""
+    raw: str = ""  # the reference as printed (from a PDF): matched as a whole when its title cannot be told apart
 
 
 def clean_doi(s: str) -> str:
@@ -130,7 +131,7 @@ def _best(ref: Reference, records: list[Record]) -> tuple[Record | None, float]:
 
 def check_reference(ref: Reference, t: Transport) -> Verdict:
     v = Verdict(key=ref.key, status="ok", title=ref.title, line=ref.line, file=ref.file)
-    if not ref.title and not ref.doi and not ref.arxiv:
+    if not ref.title and not ref.doi and not ref.arxiv and not ref.raw:
         v.status = "skipped"
         v.notes.append("no title, DOI or arXiv id to look up")
         return v
@@ -176,6 +177,25 @@ def check_reference(ref: Reference, t: Transport) -> Verdict:
             if score >= SAME_TITLE:
                 break
 
+    # 2b. A reference read from a PDF, whose title may be cut wrong: the whole entry, matched by Crossref and
+    # OpenAlex, and a hit counts only when its title is printed in the entry.
+    if ref.raw and score < SAME_TITLE:
+        raw_answered = 0
+        for search in (sources.crossref_search, sources.openalex_text):
+            try:
+                found = search(t, ref.raw)
+            except TransportError as e:
+                errors.append(str(e))
+                continue
+            raw_answered += 1
+            hit = next((r for r in found if r.title and title_in(r.title, ref.raw)), None)
+            if hit:
+                best, score = hit, 1.0
+                v.title = v.title or hit.title
+                break
+        if score < SAME_TITLE and not ref.title:
+            answered += ["crossref", "openalex"][:raw_answered]
+
     if best is None or score < SAME_TITLE:
         if errors and not candidates:
             v.status = "unknown"
@@ -192,9 +212,11 @@ def check_reference(ref: Reference, t: Transport) -> Verdict:
             v.status = "not-found"
             if errors:
                 v.notes.append("did not answer: " + "; ".join(sorted(set(errors))))
-        if ref.title:
-            names = answered or [n for n, _ in TITLE_SEARCHES]
+        if ref.title or ref.raw:
+            names = list(dict.fromkeys(answered)) or [n for n, _ in TITLE_SEARCHES]
             v.problems.append("no work with this title in " + _listing([DB_NAME[n] for n in names]))
+        if ref.raw:
+            v.notes.append(f"as printed: {ref.raw[:300]}")
         return v
 
     v.match = best
