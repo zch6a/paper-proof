@@ -13,7 +13,8 @@ paper-proof reads a LaTeX project (follows `\input` and `\include`, reads the `.
 and checks it two ways:
 
 - **the paper against itself, offline**: a bold number that is not the best of its column; "from A to B, a p%
-  gain" recomputed; a number in the abstract that appears nowhere else (an outdated result); `\ref` to a label that
+  gain" recomputed; a number in the abstract that appears nowhere else (an outdated result); a number in a sentence
+  that points to a table but differs slightly from that table's value; `\ref` to a label that
   does not exist; a label defined twice; a figure or table never referred to.
 - **each cited reference, online**: it exists (by DOI, arXiv id, then title), matches its entry (title, first author,
   authors, year), is not retracted, and points to the published version when it was cited as a preprint.
