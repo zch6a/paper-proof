@@ -55,6 +55,7 @@ class HttpTransport:
         self.timeout = timeout
         self.retries = retries
         self.mailto = mailto if mailto is not None else os.environ.get("PAPER_PROOF_MAILTO", "")
+        self.openalex_key = os.environ.get("OPENALEX_API_KEY", "")
         self._last: dict[str, float] = {}
         self._lock = threading.Lock()
 
@@ -71,6 +72,9 @@ class HttpTransport:
         host = urlsplit(url).hostname or ""
         if self.mailto and host == "api.crossref.org":
             url += ("&" if "?" in url else "?") + "mailto=" + urllib.request.quote(self.mailto)
+        # OpenAlex answers without a key, within a small daily budget; a free key (set by the user) raises it tenfold.
+        if self.openalex_key and host == "api.openalex.org":
+            url += ("&" if "?" in url else "?") + "api_key=" + urllib.request.quote(self.openalex_key)
         delay = 2.0
         last_error = ""
         for attempt in range(self.retries + 1):

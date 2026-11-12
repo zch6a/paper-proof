@@ -9,6 +9,7 @@ import os
 import re
 import sys
 from collections import Counter
+from dataclasses import asdict, dataclass, field
 
 from . import __version__
 from .check import Verdict
@@ -32,19 +33,48 @@ def use_color(stream=sys.stdout) -> bool:
     return not os.environ.get("NO_COLOR") and (bool(os.environ.get("FORCE_COLOR")) or (hasattr(stream, "isatty") and stream.isatty()))
 
 
+@dataclass
+class Extra:
+    """What reading a LaTeX project found besides the references themselves."""
+
+    main: str = ""
+    bibliography_from: str = ""
+    undefined: list[tuple[str, str, int]] = field(default_factory=list)  # (key, file, line): \cite with no entry
+    uncited: list[str] = field(default_factory=list)
+    missing_files: list[str] = field(default_factory=list)
+
+
+def _where(v: Verdict) -> str:
+    if v.file and v.line:
+        return f" ({v.file}:{v.line})"
+    return f" (line {v.line})" if v.line else ""
+
+
 def summary(verdicts: list[Verdict]) -> dict[str, int]:
     c = Counter(v.status for v in verdicts)
     return {k: c.get(k, 0) for k in ORDER}
 
 
-def text(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str, color: bool = False) -> str:
+def _scope(extra: Extra, n: int) -> str:
+    if not extra.main:
+        return f"{n} references"
+    return f"{n} cited references (main file {extra.main}, bibliography from {extra.bibliography_from})"
+
+
+def text(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str, extra: Extra | None = None, color: bool = False) -> str:
+    extra = extra or Extra()
     paint = (lambda code, s: f"\x1b[{code}m{s}\x1b[0m") if color else (lambda code, s: s)
-    out = [f"paper-proof {__version__} · {visible(source)}: {len(verdicts)} references", ""]
-    for v in sorted(verdicts, key=lambda v: (ORDER.index(v.status), v.line)):
+    out = [f"paper-proof {__version__} · {visible(source)}: {_scope(extra, len(verdicts))}", ""]
+    for key, file, line in extra.undefined:
+        out.append(f"{paint('31;1', 'UNDEFINED')} \\cite{{{visible(key)}}} ({visible(file)}:{line}) has no bibliography entry: it prints as [?]")
+    for name in extra.missing_files:
+        out.append(f"{paint('33', 'MISSING'.ljust(9))} {visible(name)} is used by the project but not in it")
+    if extra.undefined or extra.missing_files:
+        out.append("")
+    for v in sorted(verdicts, key=lambda v: (ORDER.index(v.status), v.file, v.line)):
         if v.status == "ok" and not v.notes:
             continue
-        where = f" (line {v.line})" if v.line else ""
-        out.append(f"{paint(COLOR[v.status], LABEL[v.status].ljust(9))} {visible(v.key)}{where}")
+        out.append(f"{paint(COLOR[v.status], LABEL[v.status].ljust(9))} {visible(v.key)}{_where(v)}")
         if v.title:
             out.append(f"          {visible(v.title)[:110]}")
         for p in v.problems:
@@ -60,23 +90,32 @@ def text(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str,
         out.append(f"{paint('33', 'DUPLICATE'.ljust(9))} {visible(a)} and {visible(b)} ({why})")
     if dups:
         out.append("")
+    if extra.uncited:
+        shown = ", ".join(visible(k) for k in extra.uncited[:12]) + (f" and {len(extra.uncited) - 12} more" if len(extra.uncited) > 12 else "")
+        out += [f"Not cited anywhere in the text (not checked): {shown}", ""]
     s = summary(verdicts)
     parts = [f"{n} {LABEL[k] if k not in ('ok', 'skipped') else k}" for k, n in s.items() if n]
+    if extra.undefined:
+        parts.insert(0, f"{len(extra.undefined)} UNDEFINED")
     out.append("Summary: " + ", ".join(parts) + (f", {len(dups)} duplicate(s)" if dups else ""))
     if s["unknown"]:
         out.append("Unknown means a database did not answer; run again later (answers are cached).")
     return "\n".join(out)
 
 
-def to_json(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str) -> str:
+def to_json(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str, extra: Extra | None = None) -> str:
+    extra = extra or Extra()
+    project = asdict(extra)
+    project["undefined"] = [{"key": k, "file": f, "line": n} for k, f, n in extra.undefined]
     return json.dumps(
         {
             "tool": "paper-proof",
             "version": __version__,
             "source": source,
-            "summary": summary(verdicts),
+            "summary": summary(verdicts) | {"undefined": len(extra.undefined)},
             "references": [v.to_dict() for v in verdicts],
             "duplicates": [{"first": a, "second": b, "why": why} for a, b, why in dups],
+            "project": project if extra.main else None,
         },
         indent=2,
         ensure_ascii=False,
@@ -96,10 +135,16 @@ def _code(s: str) -> str:
     return f"`{s}`"
 
 
-def markdown(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str) -> str:
+def markdown(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str, extra: Extra | None = None) -> str:
+    extra = extra or Extra()
     s = summary(verdicts)
-    out = [f"### paper-proof: {len(verdicts)} references in {_code(source)}", ""]
-    out.append(" · ".join(f"**{n}** {LABEL[k] if k not in ('ok', 'skipped') else k}" for k, n in s.items() if n))
+    out = [f"### paper-proof: {_md(_scope(extra, len(verdicts)))} in {_code(source)}", ""]
+    counts = [f"**{n}** {LABEL[k] if k not in ('ok', 'skipped') else k}" for k, n in s.items() if n]
+    if extra.undefined:
+        counts.insert(0, f"**{len(extra.undefined)}** UNDEFINED")
+    out.append(" · ".join(counts))
+    if extra.undefined:
+        out += [""] + [f"- {_code(chr(92) + 'cite{' + k + '}')} at {_code(f'{f}:{n}')} has no bibliography entry" for k, f, n in extra.undefined]
     rows = [v for v in sorted(verdicts, key=lambda v: (ORDER.index(v.status), v.line)) if v.status not in ("ok", "skipped") or v.notes]
     if rows:
         out += ["", "| | Reference | What was found |", "|---|---|---|"]

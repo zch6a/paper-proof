@@ -30,6 +30,7 @@ class Reference:
     kind: str = ""
     line: int = 0
     cited_as_preprint: bool = False
+    file: str = ""
 
 
 def clean_doi(s: str) -> str:
@@ -78,6 +79,7 @@ class Verdict:
     status: str  # ok | mismatch | not-found | retracted | unknown | skipped
     title: str
     line: int = 0
+    file: str = ""
     problems: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     match: Record | None = None
@@ -127,12 +129,12 @@ def _best(ref: Reference, records: list[Record]) -> tuple[Record | None, float]:
 
 
 def check_reference(ref: Reference, t: Transport) -> Verdict:
-    v = Verdict(key=ref.key, status="ok", title=ref.title, line=ref.line)
+    v = Verdict(key=ref.key, status="ok", title=ref.title, line=ref.line, file=ref.file)
     if not ref.title and not ref.doi and not ref.arxiv:
         v.status = "skipped"
         v.notes.append("no title, DOI or arXiv id to look up")
         return v
-    if ref.kind not in INDEXED and not ref.doi and not ref.arxiv:
+    if ref.kind and ref.kind not in INDEXED and not ref.doi and not ref.arxiv:
         v.status = "skipped"
         v.notes.append(f"@{ref.kind} without a DOI or arXiv id: such works are often not in bibliographic databases")
         return v
