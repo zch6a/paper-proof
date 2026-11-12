@@ -135,7 +135,7 @@ paper-proof needs Python 3.10+. With [uv](https://docs.astral.sh/uv/):
 uvx --from git+https://github.com/zch6a/paper-proof paper-proof path/to/paper
 ```
 
-or install it: `uv tool install git+https://github.com/zch6a/paper-proof` (or `pipx install git+https://github.com/zch6a/paper-proof`).
+or install it: `uv tool install git+https://github.com/zch6a/paper-proof` (or `pipx install git+https://github.com/zch6a/paper-proof`). For a fixed version, add `@v0.1.0` to the URL, or install the wheel from the [release](https://github.com/zch6a/paper-proof/releases).
 
 ## Use
 

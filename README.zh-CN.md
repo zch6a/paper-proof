@@ -118,7 +118,7 @@ Summary: 1 ERROR, 5 WARNINGS, 1 note
 uvx --from git+https://github.com/zch6a/paper-proof paper-proof path/to/paper
 ```
 
-或者安装：`uv tool install git+https://github.com/zch6a/paper-proof`（也可以 `pipx install git+https://github.com/zch6a/paper-proof`）。
+或者安装：`uv tool install git+https://github.com/zch6a/paper-proof`（也可以 `pipx install git+https://github.com/zch6a/paper-proof`）。要固定版本，在网址后加 `@v0.1.0`，或从 [Release](https://github.com/zch6a/paper-proof/releases) 安装 wheel。
 
 ## 用法
 
