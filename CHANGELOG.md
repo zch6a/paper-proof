@@ -16,4 +16,7 @@ First release.
   against their rows, undefined and duplicate labels, unreferenced figures and tables.
 - Inputs: a LaTeX project, `.bib`, `.bbl`, a PDF (references), or an arXiv id (its source, fetched and deleted).
 - Reports for the terminal, as JSON and as Markdown; a GitHub Action; an Agent Skill.
-- Measured on 50 real papers: 7 findings, all real; injected errors found 41/42 (bold) and 9/11 (abstract numbers).
+- Measured on 50 real papers: 7 findings, all real; injected errors found 41/42 (bold), 9/11 (abstract numbers),
+  14/18 (text against tables), 6/6 (averages). On 264 real references: 4 mismatches, two of them real errors.
+- Hardened after an independent code review: parallel cache writes, interrupted downloads, damaged and oversized
+  arXiv archives, network paths in `\input`, a quadratic regex, non-UTF-8 sources.

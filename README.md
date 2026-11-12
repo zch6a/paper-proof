@@ -177,7 +177,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zch6a/paper-proof@main
+      - uses: zch6a/paper-proof@v0
         with:
           path: paper          # the LaTeX project folder
           # checks: numbers    # offline only
