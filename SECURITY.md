@@ -6,8 +6,12 @@ text returned by public databases. Both are treated as untrusted.
 ## What it does
 
 - **Runs nothing from the paper.** It reads `.tex`, `.bib` and `.bbl` files as text. It never runs LaTeX, BibTeX,
-  shell escapes or anything else from the project, and only follows `\input` / `\include` to files inside the
-  project's folder (no absolute paths, no `..` out of it).
+  shell escapes or anything else from the project, and only follows `\input` / `\include` / `\bibliography` to files
+  inside the project's folder. Absolute, drive, UNC (`//host/share`) and `..` names are rejected from their text,
+  before any file system call, so a paper cannot make it open a network share.
+- **Bounded on hostile input.** An arXiv source is unpacked with a cap on the total (500 MB) and only its source
+  files are kept; a damaged archive is an error message. Table spans are capped, and the regular expressions run on
+  prose are linear (tested on long runs of blanks).
 - **Hostile text stays text.** Titles and keys from the bibliography and from the databases are shown with control
   and bidirectional characters made visible, so they cannot move the terminal's cursor or rewrite its title. In the
   Markdown report, nothing renders: no links, images, HTML or @mentions.
