@@ -66,6 +66,7 @@ readers, and the kind a tool can rule out before submission.
 | **Bold that is not best** | a bold number that is the only bold one of its column (within its group of rows) but not the best of it. Which way is better comes from ↑/↓, the metric (BLEU, accuracy, FID, perplexity, error, latency, ...) or the caption ("higher is better"). Tables with models in columns are read by row |
 | **Claimed changes** | "from A to B, a p% improvement" and "an N× speedup": p and N recomputed from A and B, as a relative change or in points, allowing for rounding |
 | **Abstract numbers** | each decimal number in the abstract appears in the text or a table (rounding allowed: 28.43 → 28.4); where the abstract talks about a gain, it may also be a difference or a relative change between two numbers of one table column |
+| **Averages** | an "Avg" / "Average" / "Mean" column is the mean of the numbers before it in each row (all of them, or the last few: the set the table's other rows use), allowing for rounding. A table whose rows mostly disagree defines its average another way (weighted) and is left alone |
 | **Text against tables** | a sentence that points to a table (`Table~\ref{tab:main}`) and quotes a number: the number is in that table, or a difference or relative change of two of its numbers. Reported only when a cell of the table is within 5% of it (a stale or mistyped result), with that cell |
 | **Labels** | `\ref`, `\cref`, `\autoref`... to labels that are never defined (they print as ??); labels defined twice (an error when something refers to them); figures and tables never referred to |
 | **Citations** | `\cite` keys with no bibliography entry (they print as [?]); entries nobody cites |
@@ -97,7 +98,8 @@ Measured with the scripts in [`scripts/`](scripts/) on the 50 papers of [`script
 - **Missed problems.** Errors injected into the same 50 papers (in memory) are found: a correct bold moved to a worse
   cell, **41 of 42**; a number of the abstract changed to one that is nowhere in the paper, **9 of 11**; a number in a
   sentence that points to a table moved by 0.3, **14 of 18** (the four missed are values like 0.01, where 0.3 is no
-  near neighbour).
+  near neighbour); an average that agrees with its row changed by 0.5, **6 of 6** (only six tables of the 50 papers
+  have a plain-mean average column, so this one is a small sample).
 - **References.** On the 264 references of five papers (Transformer, LoRA, DPO, LLaMA, Mistral), the first version
   reported 23 mismatches, nearly all false: later versions cited with a later year, compound and transliterated
   names, arXiv and Zenodo DOIs that Crossref does not hold, consortium authors. After the fixes: 4 mismatches, two of

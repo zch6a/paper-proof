@@ -140,6 +140,21 @@ def test_a_sentence_that_points_to_a_table():
     assert "29.1 (the table has 28.9)" in f.message and "3.5" not in f.message  # 3.5 is unlike anything in it
 
 
+def test_an_average_column_that_does_not_add_up():
+    from paper_proof.numbers import average_columns
+
+    t = r"""\begin{tabular}{lcccc}\toprule Model & MNLI & SST-2 & QNLI & Avg. \\ \midrule
+A & 84.0 & 92.0 & 90.0 & 88.7 \\ B & 85.0 & 93.0 & 91.0 & 89.7 \\ C & 86.0 & 94.0 & 89.0 & 89.7 \\ D & 87.0 & 95.0 & 92.0 & 92.1 \\
+\bottomrule\end{tabular}"""
+    (f,) = average_columns(find_tables(t)[0])
+    assert "row D: Avg. is 92.1, but the mean of the 3 numbers before it" in f.message and "91.33" in f.message
+    # a table whose rows mostly disagree defines its average some other way (weighted): left alone
+    weighted = t.replace("88.7", "80.0").replace("89.7", "81.0")
+    assert average_columns(find_tables(weighted)[0]) == []
+    # "Avg. # tokens" is not an average of the row
+    assert average_columns(find_tables(t.replace("Avg.", "Avg. \\# tokens"))[0]) == []
+
+
 def test_a_range_is_not_a_change():
     s = "the relative performance gain ranging from 33\\% to 90\\% and averaging 62\\%."
     assert change_claims(s, "a.tex", lines(s)) == []

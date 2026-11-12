@@ -12,6 +12,8 @@ First release.
   biblatex citation commands; `.bib`, `.bbl` (BibTeX styles and biblatex) or `thebibliography`; comments, `\iffalse`
   and `comment` environments ignored. Undefined citations and uncited entries.
 - **The paper against itself** (offline): bold numbers that are not the best, claimed changes recomputed, abstract
-  numbers found nowhere in the paper, undefined and duplicate labels, unreferenced figures and tables.
+  numbers found nowhere in the paper, numbers in sentences that point to a table against that table, average columns
+  against their rows, undefined and duplicate labels, unreferenced figures and tables.
+- Inputs: a LaTeX project, `.bib`, `.bbl`, a PDF (references), or an arXiv id (its source, fetched and deleted).
 - Reports for the terminal, as JSON and as Markdown; a GitHub Action; an Agent Skill.
 - Measured on 50 real papers: 7 findings, all real; injected errors found 41/42 (bold) and 9/11 (abstract numbers).

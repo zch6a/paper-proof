@@ -150,6 +150,34 @@ for d in sorted(p for p in root.iterdir() if p.is_dir()):
                 done += 1
                 break
 
+    # ---- 4. an average cell that agrees with its row changed by 0.5
+    for f, text in texts.items():
+        for t in find_tables(text, f):
+            if N.average_columns(t) or not t.header_rows:
+                continue
+            # only averages that are plain means in this table: every evaluated row agrees, at least 3 of them
+            for j, agree, disagree in N.average_rows(t):
+                if disagree or len(agree) < 3:
+                    continue
+                for i in agree:
+                    c = t.rows[i][j] if j < len(t.rows[i]) else None
+                    if c is None or c.value is None or c.decimals < 1:
+                        continue
+                    old = f"{c.value:.{c.decimals}f}"
+                    new = f"{c.value + 0.5:.{c.decimals}f}"
+                    lines = text.split("\n")
+                    if lines[c.line - 1].count(old) != 1:
+                        continue
+                    lines[c.line - 1] = lines[c.line - 1].replace(old, new)
+                    mutated = "\n".join(lines)
+                    found = [x for x in find_tables(mutated, f) if x.line == t.line]
+                    stats["average injected"] += 1
+                    if found and any(g.line == c.line for g in N.average_columns(found[0])):
+                        stats["average detected"] += 1
+                    else:
+                        misses.append(f"average miss {d.name} {f}:{c.line} ({old} -> {new}) {t.name}")
+                    break
+
 print(stats)
 for x in misses[:40]:
     print(x)
