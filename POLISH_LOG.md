@@ -98,3 +98,11 @@
 
 Both READMEs now end (before the licence) with a short section pointing to research-kit, the toolkit's front door: all
 thirteen tools in the order of the work, and one Claude Code plugin marketplace for their skills. Documentation only.
+
+### 2026-11-14 — the release workflow and plain tags
+
+The release workflow moves the major tag (v0) to the released commit. For a plain (lightweight) tag it asked GitHub
+for a tag object at the commit's sha; that request fails, gh prints the error body on stdout, and the `|| echo` kept
+that text in front of the sha, so v0 would not have moved. It now reads the ref's type and follows a tag object only
+for an annotated tag, and stops if what it got is not a sha (the same fix arxiv-diff had in its final review).
+Releases so far used annotated tags and were not affected.
