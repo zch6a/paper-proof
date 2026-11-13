@@ -184,6 +184,10 @@ paper-proof，以及怎么解读结果（“未知”不是错误；关于加粗
 - 可选：`PAPER_PROOF_MAILTO=you@example.org` 给 Crossref 一个联系邮箱（进入它的 “polite pool”）；`OPENALEX_API_KEY` 让 OpenAlex 每日额度提高十倍。都不是必需的，不设就不会发送。
 - 不使用 DBLP：它现在对脚本请求返回机器人验证页，paper-proof 不绕过这类验证。
 
+## 属于 research-kit
+
+这是 13 个开源科研工具之一，覆盖从读论文到论文发表之后。全部工具按科研流程的介绍，以及安装它们技能的 Claude Code 插件市场，见 [research-kit](https://github.com/zch6a/research-kit) · [网站](https://zch6a.github.io/research-kit/)。
+
 ## 许可证
 
 MIT

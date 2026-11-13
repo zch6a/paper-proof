@@ -93,3 +93,8 @@
 - **文档与行为逐条对照**：README / 中文 README / SECURITY 补上 doi.org（Crossref 没有的 DOI 到那里确认存在）、新的年份规则（早一年以上是错误，晚的只是提示）、
   连续失败的数据库本次不再问、给 arXiv 号时即使 `--offline` 也会取源码。CHANGELOG 补上新检查的检出率、参考文献测量和代码审查的加固。
 - **发布 v0.1.0**：Action 示例改用 `@v0`；打 tag v0.1.0 推送，release 工作流（只读任务里测试、构建、取 CHANGELOG 小节；写权限任务只调 gh）建 GitHub Release 并把 v0 标签指过去。不发 PyPI。
+
+### 2026-11-14 — a link to research-kit
+
+Both READMEs now end (before the licence) with a short section pointing to research-kit, the toolkit's front door: all
+thirteen tools in the order of the work, and one Claude Code plugin marketplace for their skills. Documentation only.

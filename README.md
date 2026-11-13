@@ -206,6 +206,12 @@ the skill folder into your agent's skills.
   `OPENALEX_API_KEY` raises OpenAlex's daily budget tenfold. Neither is needed or sent unless you set it.
 - DBLP is not used: it now answers scripted requests with a bot check, and paper-proof does not get around those.
 
+## Part of research-kit
+
+One of thirteen open research tools, from reading papers to after publication. All of them, in the order of
+the work, with one Claude Code plugin marketplace for their skills: [research-kit](https://github.com/zch6a/research-kit)
+· [site](https://zch6a.github.io/research-kit/).
+
 ## License
 
 MIT
