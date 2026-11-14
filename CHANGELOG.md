@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 — 2026-11-14
+
+- The Claude Code plugin's manifest (`plugin/.claude-plugin/plugin.json`) says 0.2.1: it had stayed at an older
+  version through the last release, so the marketplace showed the old one (found by `repro-score release`).
+- A `CITATION.cff`, for GitHub's "Cite this repository".
+
 ## 0.2.0
 
 **The paper as a whole** (`--checks consistency`, on by default, offline; LaTeX and PDF):

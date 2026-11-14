@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use paper-proof in your research, please cite it as below."
+title: "paper-proof: check a paper's references, numbers and consistency"
+type: software
+authors:
+  - alias: zch6a
+repository-code: "https://github.com/zch6a/paper-proof"
+license: MIT
+version: "0.2.1"
+date-released: "2026-11-14"
