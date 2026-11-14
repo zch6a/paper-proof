@@ -146,3 +146,25 @@ submission and never to write the review.
 
 16 tests (133 in all, on Python 3.10 too); README, Chinese README, Action input and Skill updated; the example paper
 has two consistency slips (an acronym spelled out only in the abstract, "pretrained" next to "pre-trained").
+
+### 2026-11-14 — 0.3.0: style through the LaTeX
+
+From research-kit's list: "style checking for academic writing that understands LaTeX math and works offline"
+(LanguageTool and Vale give many false alarms on math-heavy text). Only rules that can be right without a grammar:
+a word twice, a/an, reference spacing and naming, abbreviation periods, straight quotes, adjacent \cite.
+
+Measured on the 50 arXiv sources (fetched again to a temporary folder, deleted after). Three rounds:
+1. 1,368 notes. "etal" came from cite keys in `\newcite{...}` (only `\cite...` arguments were blanked); macro
+   files and the preamble were read as prose ("e.g" inside `\newcommand{\eg}{e.g.\xspace}`); "A is", "A or" (the
+   letter A as a symbol) taken for the article; "an mAP" and "a U-Net" judged wrong; 423 straight quotes and 380
+   `Figure \ref` spacings, mostly a few files of prompts and figures.
+2. Fixed those; bulk kinds became one note per file. A sample of 25 repeated words: "goo goo" (a URL), "cc cc" (a
+   column spec), "red red" (a colour), role labels in transcripts. A sample of 25 article notes: "a UNet" (read
+   you-net), "an n-gram" (en-gram), "a STEM" (a word) judged wrong.
+3. Fixed those; fresh samples of 25: repeated words 17 real (left: role labels "human human", "assistant
+   assistant", a URL, a column spec; role labels now skipped), articles 21 real (left: "a LLaMA", a variable "r",
+   French "a un", "an unidentified"; handled). Final: 262 notes in 42 papers. Reference-name mixing: macro definitions
+   (`\newcommand{\figref}[1]{Figure~\ref{#1}}`) had been counted as uses; skipped.
+
+The README states the sampled rates measured before the last fixes. Tests: doctests for `article`, and the example
+paper's two planted slips in the CLI output.

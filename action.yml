@@ -9,8 +9,8 @@ inputs:
     description: The LaTeX project folder, its main .tex file, or a .bib file (relative to the repository)
     default: "."
   checks:
-    description: '"refs,numbers,consistency" (default), "numbers,consistency" (offline: nothing is sent anywhere), or any of the three'
-    default: refs,numbers,consistency
+    description: '"refs,numbers,consistency,style" (default), "numbers,consistency,style" (offline: nothing is sent anywhere), or any of the four'
+    default: refs,numbers,consistency,style
   fail-on:
     description: '"not-found" (default: invented or retracted references, undefined citations and labels), "mismatch" (also wrong details and number warnings) or "never"'
     default: not-found

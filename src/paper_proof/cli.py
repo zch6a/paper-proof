@@ -46,10 +46,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--only", action="append", default=[], help="check only these entry keys (repeatable)")
     p.add_argument(
         "--checks",
-        default="refs,numbers,consistency",
+        default="refs,numbers,consistency,style",
         help="what to check, comma-separated: refs (references, online), numbers (tables, claimed changes, abstract numbers, "
         "labels: offline; in a PDF only the ones read from sentences), consistency (acronyms, terms written two ways, British "
-        "and American spelling mixed, a symbol with two meanings: offline). Default: refs,numbers,consistency",
+        "and American spelling mixed, a symbol with two meanings: offline), style (a word twice, a/an, Figure~\\ref, "
+        "et al., straight quotes, \\cite\\cite: LaTeX only, offline). Default: all four",
     )
     p.add_argument(
         "--review",
@@ -61,7 +62,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lookup-references", action="store_true", help="with --review: also look up the paper's references online")
     p.add_argument("--color", choices=["auto", "always", "never"], default="auto", help="colours in the terminal report (default: auto)")
     p.add_argument(
-        "--offline", action="store_true", help="same as --checks numbers,consistency: the checks send nothing (an arXiv id is still fetched)"
+        "--offline", action="store_true", help="same as --checks numbers,consistency,style: the checks send nothing (an arXiv id is still fetched)"
     )
     return p
 
@@ -70,9 +71,9 @@ def run(argv: list[str] | None = None, transport: Transport | None = None, fetch
     """`transport` and `fetcher` stand in for the network in tests."""
     args = build_parser().parse_args(argv)
     path = Path(args.bib)
-    checks = {"numbers", "consistency"} if args.offline else {c.strip() for c in args.checks.split(",") if c.strip()}
-    if not checks or checks - {"refs", "numbers", "consistency"}:
-        print(f"paper-proof: --checks takes refs, numbers and/or consistency, not {args.checks!r}", file=sys.stderr)
+    checks = {"numbers", "consistency", "style"} if args.offline else {c.strip() for c in args.checks.split(",") if c.strip()}
+    if not checks or checks - {"refs", "numbers", "consistency", "style"}:
+        print(f"paper-proof: --checks takes refs, numbers, consistency and/or style, not {args.checks!r}", file=sys.stderr)
         return 2
     if args.lookup_references and not args.review:
         print("paper-proof: --lookup-references goes with --review (without it, references are looked up anyway)", file=sys.stderr)
@@ -128,6 +129,13 @@ def _check(path: Path, args, checks: set[str], transport: Transport | None, sour
 
         extra.findings = sorted(
             extra.findings + check_consistency(extra.texts, latex=not extra.pdf, abstract=extra.abstract),
+            key=lambda x: (["error", "warning", "note"].index(x.severity), x.file, x.line),
+        )
+    if "style" in checks and extra.texts and not extra.pdf:
+        from .checks.style import check_style
+
+        extra.findings = sorted(
+            extra.findings + check_style(extra.texts),
             key=lambda x: (["error", "warning", "note"].index(x.severity), x.file, x.line),
         )
     if extra.main and not extra.bibliography_from:

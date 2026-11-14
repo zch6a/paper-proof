@@ -30,7 +30,7 @@ result of an earlier run. paper-proof finds them first. This is its real output 
 
 ```text
 $ paper-proof examples/paper --offline
-paper-proof 0.2.0 · examples/paper: main file main.tex, numbers, labels and citations (references not looked up: offline)
+paper-proof 0.3.0 · examples/paper: main file main.tex, numbers, labels and citations (references not looked up: offline)
 
 The paper against itself:
 ERROR     main.tex:23  reference to tab:ablaton, which is never defined: it prints as ??
@@ -39,13 +39,15 @@ WARNING   main.tex:15  the abstract says 1.8, which is not in the text or any ta
 WARNING   main.tex:26  from 27.3 to 28.9 is a 5.9% relative change (1.6 points), not 9.5%
 WARNING   main.tex:28  this sentence points to tab:main and says 29.2 (the table has 28.9): a number the table does not show, nor as a difference or relative change of two of its numbers
 WARNING   main.tex:41  tab:main, BLEU \uparrow: 28.1 is bold but 28.9 (SMA-large (ours)) is higher
+note      main.tex:22  "a alternative": "an" before "alternative"
+note      main.tex:23  "Table \ref{": a plain space; write "Table~\ref{" so the line never breaks before the number
 note      main.tex:26  SMA is spelled out only in the abstract or a caption (main.tex:14); the text uses it without saying what it is
 note      main.tex:28  "pretrained" (1×) here, "pre-trained" (1×) elsewhere, first at main.tex:20: one spelling throughout?
 note      never referred to in the text: tab:ablation
 
 Not cited anywhere in the text (not checked): unused2020
 
-Summary: 1 ERROR, 5 WARNINGS, 3 notes
+Summary: 1 ERROR, 5 WARNINGS, 5 notes
 ```
 
 </details>
@@ -121,6 +123,16 @@ OpenAlex and Crossref, and the report says so. The exit code is always 0.
 | **British and American** | "optimise" in a paper that otherwise writes "optimize", "modelling" next to "modeling" |
 | **Symbols** (LaTeX) | one symbol given two meanings: "Let $N$ be the number of layers" and later "Let $N$ be the batch size" |
 
+**Style, through the LaTeX** (offline; LaTeX only; every finding a note)
+
+| | |
+|---|---|
+| **Slips** | a word written twice ("the the", also across a line break); "a" or "an" wrong, acronyms read letter by letter ("an LSTM", "a CNN", "an mAP", "a U-Net") |
+| **LaTeX** | `Figure \ref{...}` with a plain space (the line can break before the number: `Figure~\ref`); straight double quotes in the text, which LaTeX prints as two closing quotes; `\cite{a}\cite{b}` for `\cite{a,b}` |
+| **One form throughout** | "Fig." and "Figure" (or "Eq." and "Equation", "Sec." and "Section") both before `\ref`; "et al" without its period, "e.g" or "i.e" missing one |
+
+Math, citations, labels, URLs, column specs, verbatim, the preamble and macro definitions are not read as prose.
+
 **Each cited reference** (online: title and identifiers go to the databases below)
 
 | | |
@@ -163,6 +175,14 @@ Measured with the scripts in [`scripts/`](scripts/) on the 50 papers of [`script
   usual rule; whether to follow it is the author's call. The first version also counted "ground truth" against
   "ground-truth" and LaTeX's closing quotes as part of an acronym's words; both fixed. The symbol check found nothing
   in these papers (128 definitions, none given two meanings); it is tested on made-up text.
+- **Style.** On the same 50 sources, 262 notes in 42 papers. Read by hand on samples: a word written twice, 17 of
+  25 real ("the the", "and and", "with with", "shows shows"; the false ones were role labels in dialogue transcripts,
+  "Human: ... human", and leftovers of URLs and table column specs, all now skipped); "a"/"an", 21 of 25 real ("a
+  MLP", "a LLM", "a increase", "an neural"; false: "a LLaMA", a variable "r", French "a un", "an unidentified", now
+  handled). The first run gave 1,368 notes: cite keys inside `\newcite{parikh-etal:2016}` read as "etal", macro
+  definitions and the preamble read as prose, the letter A in "A is" read as the article, "an mAP" and "a U-Net" judged
+  wrong, and hundreds of straight quotes and `Figure \ref` in a few files, now one note per file with a count.
+  `scripts/measure_style.py` reproduces the counts.
 - **PDFs.** Of the same papers' 372 references read from their PDFs, 323 titles come out exactly and 367 can be
   matched (the whole printed entry is matched when the title cannot be cut out).
 
@@ -191,7 +211,7 @@ or install it: `uv tool install git+https://github.com/zch6a/paper-proof` (or `p
 ```bash
 paper-proof paper/                 # a LaTeX project folder (the main .tex is found), all checks
 paper-proof paper/main.tex         # the main file
-paper-proof paper/ --offline       # numbers, labels, citations and consistency: nothing is sent anywhere
+paper-proof paper/ --offline       # numbers, labels, citations, consistency and style: nothing is sent anywhere
 paper-proof 2106.09685             # any arXiv paper: its LaTeX source, in a temporary folder deleted afterwards
 paper-proof paper.pdf              # a PDF: its references, numbers in sentences, consistency (tables lose their bold)
 paper-proof submission.pdf --review  # for a reviewer: sends nothing, lists points to check with page numbers
@@ -202,7 +222,7 @@ paper-proof paper/ --format md     # a Markdown table, for a pull request or a r
 
 | Option | |
 |---|---|
-| `--checks refs,numbers,consistency` | what to check (default all three; `--offline` is `--checks numbers,consistency`) |
+| `--checks refs,numbers,consistency,style` | what to check (default all four; `--offline` is `--checks numbers,consistency,style`) |
 | `--review` | for a reviewer: no reference lookups (nothing is sent), points to check, exit code 0; `--lookup-references` adds the reference list (its titles and authors are sent) |
 | `--fail-on not-found` | exit 1 for: `not-found` (default: invented or retracted references, undefined citations and labels), `mismatch` (also wrong details and number warnings), `never` |
 | `--only KEY` | check only these bibliography keys (repeatable) |

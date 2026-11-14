@@ -20,6 +20,9 @@ and checks it two ways:
 - **the paper as a whole, offline**: an acronym spelled out two ways, spelled out again, used before it is spelled
   out, or spelled out only in the abstract; one term written two ways ("pre-training" and "pretraining"); British and
   American spelling mixed; a symbol given two meanings (LaTeX).
+- **style, through the LaTeX, offline** (notes): a word written twice, "a"/"an", `Figure \ref` without `~`, "Fig." and
+  "Figure" mixed, "et al" without its period, straight double quotes, `\cite{a}\cite{b}`. Fixing these is mechanical:
+  offer to do it, one edit per note.
 - **each cited reference, online**: it exists (by DOI, arXiv id, then title), matches its entry (title, first author,
   authors, year), is not retracted, and points to the published version when it was cited as a preprint.
 

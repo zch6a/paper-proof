@@ -27,7 +27,7 @@
 
 ```text
 $ paper-proof examples/paper --offline
-paper-proof 0.2.0 · examples/paper: main file main.tex, numbers, labels and citations (references not looked up: offline)
+paper-proof 0.3.0 · examples/paper: main file main.tex, numbers, labels and citations (references not looked up: offline)
 
 The paper against itself:
 ERROR     main.tex:23  reference to tab:ablaton, which is never defined: it prints as ??
@@ -36,13 +36,15 @@ WARNING   main.tex:15  the abstract says 1.8, which is not in the text or any ta
 WARNING   main.tex:26  from 27.3 to 28.9 is a 5.9% relative change (1.6 points), not 9.5%
 WARNING   main.tex:28  this sentence points to tab:main and says 29.2 (the table has 28.9): a number the table does not show, nor as a difference or relative change of two of its numbers
 WARNING   main.tex:41  tab:main, BLEU \uparrow: 28.1 is bold but 28.9 (SMA-large (ours)) is higher
+note      main.tex:22  "a alternative": "an" before "alternative"
+note      main.tex:23  "Table \ref{": a plain space; write "Table~\ref{" so the line never breaks before the number
 note      main.tex:26  SMA is spelled out only in the abstract or a caption (main.tex:14); the text uses it without saying what it is
 note      main.tex:28  "pretrained" (1×) here, "pre-trained" (1×) elsewhere, first at main.tex:20: one spelling throughout?
 note      never referred to in the text: tab:ablation
 
 Not cited anywhere in the text (not checked): unused2020
 
-Summary: 1 ERROR, 5 WARNINGS, 3 notes
+Summary: 1 ERROR, 5 WARNINGS, 5 notes
 ```
 
 </details>
@@ -106,6 +108,16 @@ PDF 上能查的是从句子里读得出的内容：声称的提升（“从 27.
 | **英式与美式** | 通篇写 “optimize” 的论文里出现 “optimise”，“modelling” 和 “modeling” 混用 |
 | **符号**（LaTeX） | 同一个符号有两种含义：“Let $N$ be the number of layers”，后面又 “Let $N$ be the batch size” |
 
+**透过 LaTeX 查文字细节**（离线；只查 LaTeX；都只给提示）
+
+| | |
+|---|---|
+| **笔误** | 同一个词写了两遍（“the the”，跨行也算）；“a” 和 “an” 用错，缩写按字母读（“an LSTM”、“a CNN”、“an mAP”、“a U-Net”） |
+| **LaTeX** | `Figure \ref{...}` 中间是普通空格（可能在编号前换行，应写 `Figure~\ref`）；正文里的直双引号，LaTeX 会印成两个右引号；`\cite{a}\cite{b}` 应写成 `\cite{a,b}` |
+| **前后统一** | `\ref` 前面 “Fig.” 和 “Figure” 混用（或 “Eq.” 和 “Equation”、“Sec.” 和 “Section”）；“et al” 少了句点，“e.g”、“i.e” 少了一个句点 |
+
+公式、引用、标签、网址、表格列格式、verbatim、导言区和宏定义都不当作正文来读。
+
 **每条被引用的文献**（联网：只把标题和标识符发给下面的数据库）
 
 | | |
@@ -132,6 +144,7 @@ PDF 上能查的是从句子里读得出的内容：声称的提升（“从 27.
   引用了后来的版本所以年份更晚、复合姓和转写的名字、Crossref 不收录的 arXiv / Zenodo DOI、团体作者。修正后剩 4 条，其中两条是真的错
   （LoRA 把 Jihun Hamm 写成 “Ham”；DPO 引 “Dueling RL” 时第一作者写错）。测试用数据库的真实应答录音驱动（测试从不联网）。
 - **一致性。** 在这 50 篇论文上：同一缩写两种展开 5 处（4 篇），5 处都是真的（其中 LTI 写成 “linear time-invariant” 和 “Linear Time Invariance” 只是词形不同）；11 篇英美拼写混用，都是真的；同一个词两种写法共 161 条提示（45 篇），抽查 30 条有 28 条是真的（另外两条来自名称，如 “GPT-Neo” 有一处没写连字符）。缩写类提示（又展开一遍 87 条、先用后展开 69 条、只在摘要或图表标题里展开 15 条）符合通常的写作规则，要不要遵守由作者决定。第一版还把 “ground truth” 和 “ground-truth” 算成两种写法，并把 LaTeX 的右引号算进缩写的展开里，都已修正。符号检查在这些论文里没有发现问题（找到 128 处定义，没有一个符号有两种含义），它用构造的文本做了测试。
+- **文字细节。** 在同样 50 篇源码上共 262 条提示（42 篇）。抽样人工核对：同一个词写两遍，25 条中 17 条是真的（“the the”、“and and”、“with with”、“shows shows”；误报来自对话记录里的角色名 “Human: ... human”，以及网址和表格列格式的残留，现已跳过）；“a/an”，25 条中 21 条是真的（“a MLP”、“a LLM”、“a increase”、“an neural”；误报 “a LLaMA”、变量 “r”、法语 “a un”、“an unidentified”，现已处理）。第一版报了 1368 条：`\newcite{parikh-etal:2016}` 里的引用 key 被读成 “etal”，宏定义和导言区被当成正文，“A is” 里的字母 A 被当成冠词，“an mAP”、“a U-Net” 被判错，还有少数文件里成百个直引号和 `Figure \ref`，现在每个文件只给一条并附数量。`scripts/measure_style.py` 可以复现。
 - **PDF。** 同样几篇论文从 PDF 里读出的 372 条参考文献，323 条标题读得一字不差，367 条能匹配上（标题切不准时用整条参考文献去匹配）。
 
 会出错的地方：
@@ -156,7 +169,7 @@ uvx --from git+https://github.com/zch6a/paper-proof paper-proof path/to/paper
 ```bash
 paper-proof paper/                 # LaTeX 工程文件夹（自动找主文件），全部检查
 paper-proof paper/main.tex         # 指定主文件
-paper-proof paper/ --offline       # 只查数字、标签、引用和一致性：不发送任何内容
+paper-proof paper/ --offline       # 只查数字、标签、引用、一致性和文字细节：不发送任何内容
 paper-proof 2106.09685             # 任意 arXiv 论文：取它的 LaTeX 源码到临时目录，查完删除
 paper-proof paper.pdf              # PDF：查参考文献、句子里的数字和一致性（PDF 的文字里表格丢了加粗信息）
 paper-proof submission.pdf --review  # 审稿用：不发送任何内容，列出值得核对的地方并附页码
@@ -167,7 +180,7 @@ paper-proof paper/ --format md     # Markdown 表格，贴进 PR 或审稿意见
 
 | 选项 | |
 |---|---|
-| `--checks refs,numbers,consistency` | 查什么（默认三样都查；`--offline` 等于 `--checks numbers,consistency`） |
+| `--checks refs,numbers,consistency,style` | 查什么（默认四样都查；`--offline` 等于 `--checks numbers,consistency,style`） |
 | `--review` | 审稿用：不查参考文献（不发送任何内容），列出值得核对的地方，退出码为 0；加 `--lookup-references` 会查参考文献（发送其标题和作者） |
 | `--fail-on not-found` | 什么情况下返回 1：`not-found`（默认：编造或撤稿的文献、未定义的引用和标签）、`mismatch`（再加上信息不符和数字警告）、`never` |
 | `--only KEY` | 只查这些条目（可重复） |

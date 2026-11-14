@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 — 2026-11-14
+
+**Style, through the LaTeX** (`--checks style`, now in the default and in `--offline`; LaTeX only; notes): a word
+written twice, "a"/"an" (acronyms read letter by letter), `Figure \ref` with a plain space, reference names mixed
+("Fig." and "Figure"), "et al"/"e.g"/"i.e" missing a period, straight double quotes, `\cite{a}\cite{b}`. Math,
+citations, URLs, column specs, verbatim, the preamble and macro definitions are left out; bulk findings are one note per
+file. On the 50 papers: 262 notes; samples read by hand: 17 of 25 repeated words and 21 of 25 article notes real.
+`--review` does not include it. The example paper has two style slips.
+
 ## 0.2.1 — 2026-11-14
 
 - The Claude Code plugin's manifest (`plugin/.claude-plugin/plugin.json`) says 0.2.1: it had stayed at an older
