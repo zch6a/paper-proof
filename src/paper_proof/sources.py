@@ -140,6 +140,9 @@ _S2_FIELDS = "title,authors,year,venue,externalIds,publicationVenue,publicationT
 def _s2_record(p: dict) -> Record:
     ids = p.get("externalIds") or {}
     venue = p.get("venue") or ((p.get("publicationVenue") or {}).get("name", "")) or ((p.get("journal") or {}).get("name", ""))
+    vtype = ((p.get("publicationVenue") or {}).get("type") or "").lower()
+    kinds = p.get("publicationTypes") or []
+    published_kind = vtype if vtype in ("conference", "journal") else "conference" if "Conference" in kinds else ""
     return Record(
         source="semanticscholar",
         title=p.get("title") or "",
@@ -151,6 +154,7 @@ def _s2_record(p: dict) -> Record:
         url=f"https://www.semanticscholar.org/paper/{p['paperId']}" if p.get("paperId") else "",
         kind=",".join(p.get("publicationTypes") or []),
         published_in=venue if venue and venue.lower() not in ("arxiv", "arxiv.org") else "",
+        published_kind=published_kind,
     )
 
 
@@ -168,11 +172,11 @@ def _openalex_record(w: dict) -> Record:
     ids = w.get("ids") or {}
     doi = (w.get("doi") or "").lower().removeprefix("https://doi.org/")
     # A preprint's record may also list the published version among its locations.
-    published = ""
+    published, published_kind = "", ""
     for other in w.get("locations") or []:
         s = (other or {}).get("source") or {}
         if s.get("type") in ("conference", "journal") and s.get("display_name"):
-            published = s["display_name"]
+            published, published_kind = s["display_name"], s["type"]
             break
     return Record(
         source="openalex",
@@ -187,6 +191,7 @@ def _openalex_record(w: dict) -> Record:
         retracted=bool(w.get("is_retracted")),
         kind=w.get("type") or "",
         published_in=published,
+        published_kind=published_kind,
     )
 
 

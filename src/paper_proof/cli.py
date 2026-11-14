@@ -60,6 +60,13 @@ def build_parser() -> argparse.ArgumentParser:
         "also check the reference list (sends only the references' titles and authors to OpenAlex and Crossref)",
     )
     p.add_argument("--lookup-references", action="store_true", help="with --review: also look up the paper's references online")
+    p.add_argument(
+        "--fix",
+        action="store_true",
+        help="also write a corrected copy of each .bib file next to it (refs.bib -> refs.fixed.bib; the original is not "
+        "touched): preprints that have been published become the published version, years earlier than the work's are "
+        "corrected, missing DOIs are added when the match is certain. Everything else is listed for you to check",
+    )
     p.add_argument("--color", choices=["auto", "always", "never"], default="auto", help="colours in the terminal report (default: auto)")
     p.add_argument(
         "--offline", action="store_true", help="same as --checks numbers,consistency,style: the checks send nothing (an arXiv id is still fetched)"
@@ -77,6 +84,12 @@ def run(argv: list[str] | None = None, transport: Transport | None = None, fetch
         return 2
     if args.lookup_references and not args.review:
         print("paper-proof: --lookup-references goes with --review (without it, references are looked up anyway)", file=sys.stderr)
+        return 2
+    if args.fix and (args.review or args.offline or "refs" not in checks):
+        print("paper-proof: --fix needs the reference check (not with --review, --offline or --checks without refs)", file=sys.stderr)
+        return 2
+    if args.fix and not path.exists() and arxiv_source.is_arxiv_id(args.bib):
+        print("paper-proof: --fix needs your own .bib file or LaTeX project, not an arXiv id", file=sys.stderr)
         return 2
     if args.review:
         # A submission is confidential: by default nothing about it leaves this computer.
@@ -153,6 +166,12 @@ def _check(path: Path, args, checks: set[str], transport: Transport | None, sour
         # Offline, references are not looked up; undefined citations need no network and are still reported.
         refs = []
         extra.refs_checked = False
+    bibs: list[Path] = []
+    if args.fix:
+        bibs = bib_files(path, refs)
+        if not bibs:
+            print("paper-proof: --fix rewrites .bib files; this paper has none (a PDF, a .bbl or a thebibliography)", file=sys.stderr)
+            return 2
     if args.only:
         refs = [r for r in refs if r.key in set(args.only)]
     if not refs:
@@ -176,7 +195,50 @@ def _check(path: Path, args, checks: set[str], transport: Transport | None, sour
         print(report.markdown(verdicts, dups, source, extra))
     else:
         print(report.text(verdicts, dups, source, extra, color=report.use_color(choice=args.color)))
+    if bibs:
+        write_fixes(bibs, path, verdicts, sys.stderr if args.format == "json" else sys.stdout, transport)
     return 1 if failed(args.fail_on, verdicts, extra) else 0
+
+
+def bib_files(path: Path, refs: list[Reference]) -> list[Path]:
+    """The .bib files the references come from."""
+    if path.is_file() and path.suffix.lower() == ".bib":
+        return [path]
+    root = bib_root(path)
+    if root is None:
+        return []
+    return [root / f for f in dict.fromkeys(r.file for r in refs) if f.lower().endswith(".bib")]
+
+
+def bib_root(path: Path) -> Path | None:
+    """The folder of the main .tex file, which the references' file names are relative to."""
+    main = find_main(path) if path.is_dir() else path
+    if main is None or main.suffix.lower() != ".tex":
+        return None
+    return main.resolve().parent
+
+
+def write_fixes(bibs: list[Path], path: Path, verdicts: list[Verdict], out, transport: Transport | None = None) -> None:
+    from .fix import write_fixed
+
+    single = path.is_file() and path.suffix.lower() == ".bib"
+    root = bibs[0].parent if single else bib_root(path) or bibs[0].parent
+    for bib in bibs:
+        rel = bib.relative_to(root).as_posix()
+        mine = [v for v in verdicts if single or v.file == rel]
+        written, fixes, left = write_fixed(bib, mine, transport)
+        print("", file=out)
+        changed = [f for f in fixes if f.set or f.drop or f.type]
+        if written:
+            n = f"{len(changed)} {'entry' if len(changed) == 1 else 'entries'}"
+            print(f"wrote {written.name} next to {rel}: {n} changed (compare, then replace the original)", file=out)
+        else:
+            print(f"{rel}: nothing to change automatically", file=out)
+        for f in fixes:
+            for c in f.changes:
+                print(f"  {f.key} (line {f.line}): {c}", file=out)
+        if left:
+            print(f"  left for you ({len(left)}): " + ", ".join(f"{v.key} ({v.status})" for v in left), file=out)
 
 
 def failed(level: str, verdicts: list[Verdict], extra: report.Extra) -> bool:

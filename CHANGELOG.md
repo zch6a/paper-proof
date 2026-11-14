@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.4.0 — 2026-11-14
+
+**`--fix`: a corrected copy of the bibliography** (`refs.bib` → `refs.fixed.bib`, next to it; the original is never
+touched, and every other character of the file stays as it was). A preprint that has been published becomes the
+published version (`@inproceedings` + `booktitle` or `@article` + `journal`, DOI, arXiv id kept as `eprint`); a year
+earlier than the work's DOI record says is corrected; a missing DOI is added. Only what a database vouches for:
+
+- a year comes only from the published version's own Crossref record or from the venue's name; Semantic Scholar and
+  OpenAlex often give the preprint's year (Adam: 2014, for ICLR 2015), so otherwise the year is left and flagged;
+- a DOI is used only after its own Crossref record agrees (title, first author, year at most one off, and the same
+  kind of publication as the entry): those databases merge versions, and on real bibliographies this caught ImageNet
+  (2012) getting the 2017 Communications of the ACM reprint's DOI and Group Normalization (ECCV 2018) getting the
+  IJCV version's;
+- a venue that could be a conference or a journal is reported, not guessed; invented references, wrong authors and
+  retractions are listed for a person.
+
+Measured on the four .bib files of LoRA, Mamba and ViT (arXiv sources; DPO ships only a .bbl, which `--fix` declines):
+86 entries changed, read one by one. 46 preprints moved to their published version, all to the right venue (one,
+GLUE, to its 2018 BlackboxNLP workshop paper rather than ICLR 2019: a real published version, not the usual one); 18
+of them dated, 28 with the year flagged for checking (NeurIPS, ICLR and ICML papers have no DOI to date them). 40 DOIs
+added, every one the cited version's. One venue (BIGSCIENCE) reported as unclear.
+
+Also: the published version of a preprint is dated by its DOI's Crossref record in the normal report too ("published
+in Proceedings of the 2019 Conference of the North American Chapter ... (2019)").
+
 ## 0.3.0 — 2026-11-14
 
 **Style, through the LaTeX** (`--checks style`, now in the default and in `--offline`; LaTeX only; notes): a word

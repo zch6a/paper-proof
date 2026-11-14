@@ -18,6 +18,11 @@ class Entry:
     key: str
     fields: dict[str, str] = field(default_factory=dict)
     line: int = 1
+    # Where the entry sits in the file, for rewriting it: the type word, the closing bracket, and for each field
+    # (name start, value start, value end).
+    type_span: tuple[int, int] = (0, 0)
+    close: int = 0
+    spans: dict[str, tuple[int, int, int]] = field(default_factory=dict, repr=False)
 
     def get(self, name: str) -> str:
         return self.fields.get(name, "")
@@ -58,13 +63,15 @@ def parse_bib(text: str) -> list[Entry]:
         if kind in ("comment", "preamble"):
             continue
         if kind == "string":
-            for name, value in _fields(body, macros, line):
+            for name, value, _ in _fields(body, macros, line):
                 macros[name] = value
             continue
         key, _, rest = body.partition(",")
-        entry = Entry(type=kind, key=key.strip(), line=line)
-        for name, value in _fields(rest, macros, line):
+        entry = Entry(type=kind, key=key.strip(), line=line, type_span=m.span(1), close=end)
+        offset = body_start + len(key) + 1
+        for name, value, (a, b, c) in _fields(rest, macros, line):
             entry.fields[name] = value
+            entry.spans[name] = (a + offset, b + offset, c + offset)
         entries.append(entry)
     return entries
 
@@ -99,7 +106,8 @@ def _fields(body: str, macros: dict[str, str], line: int):
         if not m:
             break
         name = m.group(1).lower()
-        i = m.end()
+        name_start = m.start(1)
+        i = value_start = m.end()
         parts: list[str] = []
         while i < n:
             c = body[i]
@@ -132,7 +140,7 @@ def _fields(body: str, macros: dict[str, str], line: int):
                 i = concat.end()
                 continue
             break
-        yield name, "".join(parts).strip()
+        yield name, "".join(parts).strip(), (name_start, value_start, i)
 
 
 # ---------------------------------------------------------------- LaTeX to plain text

@@ -168,3 +168,24 @@ Measured on the 50 arXiv sources (fetched again to a temporary folder, deleted a
 
 The README states the sampled rates measured before the last fixes. Tests: doctests for `article`, and the example
 paper's two planted slips in the CLI output.
+
+## 0.4.0：`--fix`（2026-11-14）
+
+research-kit 的空白清单里有一条“找出 .bib 里不存在或信息错的文献，并把预印本换成正式发表版”。前半条 paper-proof
+早就做了，后半条只报告不改。这一版加 `--fix`：在每个 .bib 旁边写一份 `*.fixed.bib`，原文件不动，只改数据库能担保的。
+
+1. 第一版在示例 .bib 上就出错：ResNet（CVPR 2016）被改成 2015（Semantic Scholar 给的是 arXiv 年份），Adam
+   （ICLR 2015）被写成 2014。试过 DBLP（它按会议给年份），仍返回 HTTP 202 机器人验证页，不绕过。改为：年份只信
+   正式版 DOI 的 Crossref 记录或会议名称里的年份，其他情况保留原年份并提示核对。
+2. 在 LoRA、Mamba、ViT 的 4 个 .bib 上实测：ImageNet（2012）被补上 2017 年 CACM 重印版的 DOI——Semantic Scholar
+   把版本合并了，DOI 和年份不是同一个版本。改为：DOI 只从 Crossref 记录来；结果一个都补不上（标题检索几乎总是
+   Semantic Scholar 先命中），于是改成拿候选 DOI 去查它自己的 Crossref 记录，标题、第一作者、年份（差不超过 1）都对才用。
+3. 再跑：Group Normalization（ECCV 2018）补上了 IJCV 期刊版的 DOI（同标题，年份差 1）。加了“出版类型要一致”：
+   会议条目不收 journal-article，期刊条目不收 proceedings-article / book-chapter。
+4. arXiv 的 journal_ref 带页码和地点（“SIGDIAL 2017 Conference, pages 201-206, Saarbrücken…”），截掉。
+5. 终版：改了 86 条，逐条看过。预印本换正式版 46 条，会议/期刊全对（GLUE 换成了 2018 年 BlackboxNLP 研讨会版，
+   确有其文但不是常引的 ICLR 2019 版）；其中 18 条年份已确定，28 条年份提示核对。补 DOI 40 条，全是所引版本的。
+   BIGSCIENCE 一条分不清会议还是期刊，只报告。
+
+测试：149 个（新增 tests/test_fix.py：改写不留悬空逗号、对齐 `=`、CRLF、圆括号条目、只动目标条目、什么情况不改；
+示例 .bib 的端到端；JSON 报告仍是合法 JSON；LaTeX 工程里的 .bib）。新增的一条 Crossref 应答是真实录制的。

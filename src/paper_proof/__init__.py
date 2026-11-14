@@ -1,3 +1,3 @@
 """paper-proof: check the facts in a paper — its references and its numbers."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

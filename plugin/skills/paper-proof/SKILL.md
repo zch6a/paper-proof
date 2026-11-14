@@ -25,6 +25,8 @@ and checks it two ways:
   offer to do it, one edit per note.
 - **each cited reference, online**: it exists (by DOI, arXiv id, then title), matches its entry (title, first author,
   authors, year), is not retracted, and points to the published version when it was cited as a preprint.
+  `--fix` writes a corrected copy next to each .bib (`refs.fixed.bib`): published versions, years and DOIs that a
+  database vouches for. Show the user the difference and let them replace the original; never overwrite it.
 
 ## Running it
 

@@ -88,6 +88,7 @@ class Verdict:
     notes: list[str] = field(default_factory=list)
     match: Record | None = None
     closest: str = ""
+    published: Record | None = None  # the published version of a reference cited as a preprint
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -317,12 +318,34 @@ def check_reference(ref: Reference, t: Transport) -> Verdict:
                 continue
             published = published_version()
         if published:
+            published = _dated(published, ref, t)
+            v.published = published
             year = f" ({published.year})" if published.year else ""
             v.notes.append(f"cited as an arXiv preprint, but published in {published.published_in}{year}")
 
     if v.problems:
         v.status = "mismatch"
     return v
+
+
+def _dated(published: Record, ref: Reference, t: Transport) -> Record:
+    """The published version as its DOI's Crossref record describes it: the year of that version (Semantic Scholar
+    and OpenAlex often give the preprint's), the venue's full name, and whether it is a conference or a journal.
+    Without a DOI, or when Crossref does not answer, the record is returned as it was."""
+    doi = published.doi
+    if not doi or doi.startswith("10.48550/arxiv"):
+        return published
+    try:
+        found = sources.crossref_doi(t, doi)
+    except TransportError:
+        return published
+    if not found or title_similarity(ref.title or published.title, found[0].title) < SAME_TITLE:
+        return published
+    cr = found[0]
+    kind = {"proceedings-article": "conference", "journal-article": "journal"}.get(cr.kind, published.published_kind)
+    return dataclasses.replace(
+        published, source="crossref", year=cr.year or published.year, published_in=cr.venue or published.published_in, published_kind=kind
+    )
 
 
 def duplicates(refs: list[Reference]) -> list[tuple[str, str, str]]:

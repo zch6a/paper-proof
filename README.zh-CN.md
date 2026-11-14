@@ -125,7 +125,7 @@ PDF 上能查的是从句子里读得出的内容：声称的提升（“从 27.
 | **存在** | 先按 DOI（Crossref；Crossref 没有的 DOI，如 Zenodo 的，到 doi.org 确认）和 arXiv 号精确查，再按标题查 Semantic Scholar、OpenAlex、Crossref、arXiv。至少两个应答了的数据库都没有：`NOT FOUND`，并给出最接近的标题 |
 | **信息对得上** | 标题、第一作者、其他作者、年份、DOI 或 arXiv 号是否指向别的论文：`MISMATCH`。年份比记录早一年以上算错误；晚的只给提示（后来的版本、期刊版或重印） |
 | **已撤稿** | OpenAlex 标记为撤稿：`RETRACTED` |
-| **已正式发表** | 引的是 arXiv 预印本，其实已在某会议/期刊发表：给出出处，方便改引正式版 |
+| **已正式发表** | 引的是 arXiv 预印本，其实已在某会议/期刊发表：给出出处，方便改引正式版（`--fix` 直接改写条目） |
 | **重复** | DOI、arXiv 号或标题相同的两个条目 |
 
 只查正文真正引用了的：从主文件跟着 `\input`、`\include`、`\subfile` 走，读 `\bibliography` / `\addbibresource`
@@ -174,6 +174,7 @@ paper-proof 2106.09685             # 任意 arXiv 论文：取它的 LaTeX 源�
 paper-proof paper.pdf              # PDF：查参考文献、句子里的数字和一致性（PDF 的文字里表格丢了加粗信息）
 paper-proof submission.pdf --review  # 审稿用：不发送任何内容，列出值得核对的地方并附页码
 paper-proof refs.bib               # 只查一个参考文献库
+paper-proof paper/ --fix          # 另写一份 refs.fixed.bib：换成正式发表版、改确定的年份、补 DOI
 paper-proof paper/ --format json   # 每个问题带文件和行号，给脚本用
 paper-proof paper/ --format md     # Markdown 表格，贴进 PR 或审稿意见
 ```
@@ -183,12 +184,33 @@ paper-proof paper/ --format md     # Markdown 表格，贴进 PR 或审稿意见
 | `--checks refs,numbers,consistency,style` | 查什么（默认四样都查；`--offline` 等于 `--checks numbers,consistency,style`） |
 | `--review` | 审稿用：不查参考文献（不发送任何内容），列出值得核对的地方，退出码为 0；加 `--lookup-references` 会查参考文献（发送其标题和作者） |
 | `--fail-on not-found` | 什么情况下返回 1：`not-found`（默认：编造或撤稿的文献、未定义的引用和标签）、`mismatch`（再加上信息不符和数字警告）、`never` |
+| `--fix` | 另外在每个 `.bib` 旁边写一份改好的副本（`refs.bib` → `refs.fixed.bib`，原文件不动），见下文 |
 | `--only KEY` | 只查这些条目（可重复） |
 | `--jobs 4` | 同时查几条；每个数据库仍按自己的节奏 |
 | `--no-cache`、`--cache-dir` | 应答缓存 30 天，第二次运行不再请求任何人 |
 | `--color auto` | 也可 `always`、`never`；默认只在终端里上色（认 `FORCE_COLOR` 和 `NO_COLOR`） |
 
 退出码：0 没有达到 `--fail-on` 级别的问题，1 发现问题，2 输入读不了。
+
+### `--fix`：改好的参考文献副本
+
+`--fix` 只改数据库能担保的内容，文件里其他字符一律不动：
+
+- 已正式发表的预印本换成正式版：`@inproceedings` 加 `booktitle`，或 `@article` 加 `journal`，补上 DOI，arXiv 号保留在
+  `eprint`。年份只在正式版的 DOI（Crossref）或会议名称（“NAACL 2019”）能确定时才改；Semantic Scholar 和 OpenAlex
+  常给出预印本的年份（Adam 给的是 2014，实为 ICLR 2015），所以其他情况下年份不动，报告里提示你核对。分不清是会议
+  还是期刊的，只报告，不猜；
+- 年份早于该文 DOI 在 Crossref 记录的年份，改成记录的年份；
+- 缺 DOI 时，要这个 DOI 自己的 Crossref 记录标题相同、第一作者相同、年份相差不超过一年才补上。Semantic Scholar
+  和 OpenAlex 会把不同版本合在一起，给的 DOI 可能是另一个版本的（2012 年的 ImageNet 论文配上了 2017 年
+  Communications of the ACM 重印版的 DOI），所以不直接采用。
+
+查无此文、作者不对、DOI 指向别的文章、已撤稿的条目只列出来，留给你处理。先对比两个文件（`git diff --no-index refs.bib
+refs.fixed.bib`），再替换原文件。
+
+在 LoRA、Mamba、ViT 的 4 个 `.bib` 上实测，改了 86 条，逐条人工核对：46 条预印本换成正式版，会议/期刊都对（GLUE
+换成了 2018 年的研讨会版，而不是常引的 ICLR 2019 版），其中 18 条年份已确定，28 条提示核对年份；补了 40 个 DOI，
+都是所引那个版本的。
 
 ## 每次推送自动检查（GitHub Action）
 

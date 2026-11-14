@@ -26,6 +26,7 @@ class Record:
     kind: str = ""  # e.g. journal-article, proceedings-article, preprint
     # Where the work was published when the record is a preprint (DBLP and OpenAlex know both versions).
     published_in: str = ""
+    published_kind: str = ""  # "conference" or "journal", when the database says which
 
 
 def norm_text(s: str) -> str:

@@ -140,7 +140,7 @@ Math, citations, labels, URLs, column specs, verbatim, the preamble and macro de
 | **Exists** | looked up by DOI (Crossref; a DOI Crossref does not hold, such as Zenodo's, is confirmed at doi.org) and arXiv id, then by title in Semantic Scholar, OpenAlex, Crossref and arXiv. Not found in at least two databases that answered: `NOT FOUND`, with the closest title if there is one |
 | **Matches** | title, first author, the other authors, the year, and a DOI or arXiv id that points to a different work: `MISMATCH`. A year more than one before the record's is an error; a later one is only a note (a later version, a journal version or a reprint) |
 | **Retracted** | the work is marked retracted in OpenAlex: `RETRACTED` |
-| **Published since** | cited as an arXiv preprint, but published at a venue: says where, so you can cite the final version |
+| **Published since** | cited as an arXiv preprint, but published at a venue: says where, so you can cite the final version (`--fix` rewrites the entry) |
 | **Duplicates** | two entries with the same DOI, arXiv id or title |
 
 Only what the text actually cites is checked: paper-proof follows `\input`, `\include` and `\subfile` from the main
@@ -216,6 +216,7 @@ paper-proof 2106.09685             # any arXiv paper: its LaTeX source, in a tem
 paper-proof paper.pdf              # a PDF: its references, numbers in sentences, consistency (tables lose their bold)
 paper-proof submission.pdf --review  # for a reviewer: sends nothing, lists points to check with page numbers
 paper-proof refs.bib               # just a bibliography
+paper-proof paper/ --fix          # also writes refs.fixed.bib: published versions, certain years and DOIs
 paper-proof paper/ --format json   # every finding with file and line, for scripts
 paper-proof paper/ --format md     # a Markdown table, for a pull request or a review
 ```
@@ -225,12 +226,35 @@ paper-proof paper/ --format md     # a Markdown table, for a pull request or a r
 | `--checks refs,numbers,consistency,style` | what to check (default all four; `--offline` is `--checks numbers,consistency,style`) |
 | `--review` | for a reviewer: no reference lookups (nothing is sent), points to check, exit code 0; `--lookup-references` adds the reference list (its titles and authors are sent) |
 | `--fail-on not-found` | exit 1 for: `not-found` (default: invented or retracted references, undefined citations and labels), `mismatch` (also wrong details and number warnings), `never` |
+| `--fix` | also write a corrected copy of each `.bib` next to it (`refs.bib` → `refs.fixed.bib`; the original is not touched). See below |
 | `--only KEY` | check only these bibliography keys (repeatable) |
 | `--jobs 4` | references checked at once; each database keeps its own pace |
 | `--no-cache`, `--cache-dir` | answers are cached for 30 days, so a second run asks nobody again |
 | `--color auto` | `always`, `never`; by default colours only on a terminal (`FORCE_COLOR` and `NO_COLOR` are honoured) |
 
 Exit codes: 0 nothing at the `--fail-on` level, 1 something found, 2 the input could not be read.
+
+### `--fix`: a corrected copy of the bibliography
+
+`--fix` changes only what a database vouches for, and leaves every other character of the file as it was:
+
+- a preprint that has been published becomes the published version: `@inproceedings` with the `booktitle`, or
+  `@article` with the `journal`, the DOI, and the arXiv id kept as `eprint`. The year is changed only when the
+  published version's DOI dates it (Crossref) or the venue's name does ("NAACL 2019"); Semantic Scholar and
+  OpenAlex often give the preprint's year (Adam: 2014, for ICLR 2015), so otherwise the year is left and the
+  report says to check it. A venue that could be a conference or a journal is reported, not guessed;
+- a year earlier than the year in the work's DOI record (Crossref) becomes that year;
+- a missing DOI is added when that DOI's own Crossref record has the same title, the same first author and a
+  year at most one off. Semantic Scholar and OpenAlex merge versions, so their DOI can be another version's
+  (ImageNet, 2012, comes with the DOI of its 2017 reprint in Communications of the ACM): it is never taken on
+  their word.
+
+Invented references, wrong authors, a DOI that points to another work and retractions are listed for you: they
+need a person. Compare the two files (`git diff --no-index refs.bib refs.fixed.bib`), then replace the original.
+
+On the four `.bib` files of LoRA, Mamba and ViT it changed 86 entries, each read by hand: 46 preprints moved to the
+right venue (one, GLUE, to its 2018 workshop paper rather than ICLR 2019), 18 of them dated and 28 with the year
+flagged; 40 DOIs added, each the cited version's.
 
 ## On every push (GitHub Action)
 
