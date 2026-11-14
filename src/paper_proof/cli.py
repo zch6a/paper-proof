@@ -46,12 +46,23 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--only", action="append", default=[], help="check only these entry keys (repeatable)")
     p.add_argument(
         "--checks",
-        default="refs,numbers",
+        default="refs,numbers,consistency",
         help="what to check, comma-separated: refs (references, online), numbers (tables, claimed changes, abstract numbers, "
-        "labels: offline, LaTeX only). Default: refs,numbers",
+        "labels: offline; in a PDF only the ones read from sentences), consistency (acronyms, terms written two ways, British "
+        "and American spelling mixed, a symbol with two meanings: offline). Default: refs,numbers,consistency",
     )
+    p.add_argument(
+        "--review",
+        action="store_true",
+        help="for a reviewer, on a submission (PDF or LaTeX): nothing from the paper is sent anywhere (numbers and "
+        "consistency only), the report lists points to check, and the exit code is always 0. Add --lookup-references to "
+        "also check the reference list (sends only the references' titles and authors to OpenAlex and Crossref)",
+    )
+    p.add_argument("--lookup-references", action="store_true", help="with --review: also look up the paper's references online")
     p.add_argument("--color", choices=["auto", "always", "never"], default="auto", help="colours in the terminal report (default: auto)")
-    p.add_argument("--offline", action="store_true", help="same as --checks numbers: the checks send nothing (an arXiv id is still fetched)")
+    p.add_argument(
+        "--offline", action="store_true", help="same as --checks numbers,consistency: the checks send nothing (an arXiv id is still fetched)"
+    )
     return p
 
 
@@ -59,10 +70,17 @@ def run(argv: list[str] | None = None, transport: Transport | None = None, fetch
     """`transport` and `fetcher` stand in for the network in tests."""
     args = build_parser().parse_args(argv)
     path = Path(args.bib)
-    checks = {"numbers"} if args.offline else {c.strip() for c in args.checks.split(",") if c.strip()}
-    if not checks or checks - {"refs", "numbers"}:
-        print(f"paper-proof: --checks takes refs and/or numbers, not {args.checks!r}", file=sys.stderr)
+    checks = {"numbers", "consistency"} if args.offline else {c.strip() for c in args.checks.split(",") if c.strip()}
+    if not checks or checks - {"refs", "numbers", "consistency"}:
+        print(f"paper-proof: --checks takes refs, numbers and/or consistency, not {args.checks!r}", file=sys.stderr)
         return 2
+    if args.lookup_references and not args.review:
+        print("paper-proof: --lookup-references goes with --review (without it, references are looked up anyway)", file=sys.stderr)
+        return 2
+    if args.review:
+        # A submission is confidential: by default nothing about it leaves this computer.
+        checks = {"numbers", "consistency"} | ({"refs"} if args.lookup_references else set())
+        args.fail_on = "never"
     if args.jobs < 1:
         print("paper-proof: --jobs must be at least 1", file=sys.stderr)
         return 2
@@ -92,8 +110,26 @@ def _check(path: Path, args, checks: set[str], transport: Transport | None, sour
     except (BibError, InputError) as e:
         print(f"paper-proof: {path}: {e}", file=sys.stderr)
         return 2
+    if args.review:
+        extra.review = (
+            "review mode: only the titles and authors of the paper's references were sent (to OpenAlex and Crossref); nothing else left this computer"
+            if "refs" in checks
+            else "review mode: nothing from the paper was sent anywhere"
+        )
     if "numbers" in checks and extra.texts:
-        extra.findings = check_numbers(extra.texts)
+        if extra.pdf:
+            from .pdf_text import pdf_numbers
+
+            extra.findings = [f for name, t in extra.texts.items() for f in pdf_numbers(t, name)]
+        else:
+            extra.findings = check_numbers(extra.texts)
+    if "consistency" in checks and extra.texts:
+        from .checks.consistency import check_consistency
+
+        extra.findings = sorted(
+            extra.findings + check_consistency(extra.texts, latex=not extra.pdf, abstract=extra.abstract),
+            key=lambda x: (["error", "warning", "note"].index(x.severity), x.file, x.line),
+        )
     if extra.main and not extra.bibliography_from:
         extra.findings.append(
             Finding(
@@ -162,13 +198,22 @@ def load(path: Path, need_refs: bool = True) -> tuple[list[Reference], report.Ex
         return refs, extra
     if suffix == ".pdf":
         from .pdf import references_from_pdf
+        from .pdf_text import abstract_span, pdf_pages, prose
 
         try:
-            refs = references_from_pdf(path)
+            pages = pdf_pages(path)
+            refs = references_from_pdf(path) if need_refs else []
         except Exception as e:  # pypdf raises many kinds of errors on damaged or encrypted files
             raise InputError(f"cannot read this PDF ({e.__class__.__name__}: {str(e)[:120]})") from e
         if not refs and need_refs:
             raise InputError("no References section found in this PDF (a scanned PDF has no text to read)")
+        if not "".join(pages).strip():
+            raise InputError("this PDF has no text to read (a scanned PDF?)")
+        text = prose(pages)
+        extra.pdf, extra.texts = True, {path.name: text}
+        span = abstract_span(text)
+        # the title, the authors and the abstract (read on its own) do not count for acronyms spelled out or used
+        extra.abstract = {path.name: (0, span[1])} if span else {}
         return refs, extra
     if suffix == ".bbl":
         return parse_bbl(read_source(path), path.name), extra

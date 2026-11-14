@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.2.0
+
+**The paper as a whole** (`--checks consistency`, on by default, offline; LaTeX and PDF):
+
+- Acronyms: one acronym spelled out two different ways (a warning); spelled out again after its first definition;
+  used before it is spelled out; spelled out only in the abstract or a caption. The abstract and captions do not
+  count as the first definition; files are read in the order `\input` and `\include` put them in. "Low-Rank
+  Adaptation (LoRA)" and "Low-Rank Adaptation, or LoRA" are both definitions.
+- One term written two ways ("pre-training" and "pretraining", "data set" and "dataset"), with how often each is used.
+- British and American spelling mixed in one paper.
+- (LaTeX) One symbol given two meanings ("Let $N$ be the number of layers", later "Let $N$ be the batch size").
+
+On the 50 papers of `scripts/papers.txt`: 5 acronyms spelled out two ways, all real (Mamba, RoFormer, InstructGPT,
+BERT); 11 papers mixing British and American spelling, all real; terms written two ways in 45 papers, 28 of a sample
+of 30 real. `scripts/measure_consistency.py` reproduces the counts.
+
+**For reviewers** (`--review`): on a submitted PDF (or LaTeX), nothing is sent anywhere; the report lists points to
+check, with page numbers, and the exit code is 0. `--lookup-references` adds the reference list (its titles and
+authors are sent to OpenAlex and Crossref, and the report says so).
+
+**A PDF gets more than its references**: claimed changes ("from A to B, a p% gain") and abstract numbers that appear
+nowhere else in the text are checked too, with page numbers; its reference list is left out of the prose checks.
+
 ## 0.1.0
 
 First release.

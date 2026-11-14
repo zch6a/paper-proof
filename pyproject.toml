@@ -1,6 +1,6 @@
 [project]
 name = "paper-proof"
-version = "0.1.0"
+version = "0.2.0"
 description = "Checks the facts in a paper before anyone else does: every reference exists and says what the bibliography claims (title, authors, year, venue, not retracted), and the numbers in the text agree with the tables."
 readme = "README.md"
 license = "MIT"

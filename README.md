@@ -30,7 +30,7 @@ result of an earlier run. paper-proof finds them first. This is its real output 
 
 ```text
 $ paper-proof examples/paper --offline
-paper-proof 0.1.0 · examples/paper: main file main.tex, numbers, labels and citations (references not looked up: offline)
+paper-proof 0.2.0 · examples/paper: main file main.tex, numbers, labels and citations (references not looked up: offline)
 
 The paper against itself:
 ERROR     main.tex:23  reference to tab:ablaton, which is never defined: it prints as ??
@@ -39,11 +39,13 @@ WARNING   main.tex:15  the abstract says 1.8, which is not in the text or any ta
 WARNING   main.tex:26  from 27.3 to 28.9 is a 5.9% relative change (1.6 points), not 9.5%
 WARNING   main.tex:28  this sentence points to tab:main and says 29.2 (the table has 28.9): a number the table does not show, nor as a difference or relative change of two of its numbers
 WARNING   main.tex:41  tab:main, BLEU \uparrow: 28.1 is bold but 28.9 (SMA-large (ours)) is higher
+note      main.tex:26  SMA is spelled out only in the abstract or a caption (main.tex:14); the text uses it without saying what it is
+note      main.tex:28  "pretrained" (1×) here, "pre-trained" (1×) elsewhere, first at main.tex:20: one spelling throughout?
 note      never referred to in the text: tab:ablation
 
 Not cited anywhere in the text (not checked): unused2020
 
-Summary: 1 ERROR, 5 WARNINGS, 1 note
+Summary: 1 ERROR, 5 WARNINGS, 3 notes
 ```
 
 </details>
@@ -66,6 +68,36 @@ paper-proof reports 7 problems. **We checked each one by hand against the source
 None of these changes a paper's conclusions. They are exactly the slips that get past authors and get noticed by
 readers, and the kind a tool can rule out before submission.
 
+**Across the whole paper**, the same 50 papers have one acronym spelled out two ways (Mamba: SSM is "structured
+state space models" in the abstract and "state space sequence models" in the introduction; RoFormer: RoPE is both
+"Rotary Position Embedding" and "rotary position encoding"; InstructGPT: RM is "reward model" and "Reward
+modeling"; BERT: MLM is "masked language model" and "masked LM"), British spellings in American papers (CLIP,
+GPT-3, DINOv2, Llama 2 and seven more), and terms written two ways in 45 of the 50 (in one paper "pre-training" 30 times
+and "pretraining" 5, in another "fine-tuning" 20 times and "finetuning" 2).
+
+## For reviewers: `--review`
+
+A reviewer has the PDF and may not upload it anywhere. `paper-proof submission.pdf --review` reads it on your
+computer and sends nothing: no reference lookups, no language model. It lists points to check, with page numbers,
+and never writes a review:
+
+```text
+$ paper-proof 2312.00752.pdf --review
+review mode: nothing from the paper was sent anywhere
+Each point below is something to check, not a verdict on the paper.
+
+WARNING   2312.00752.pdf p.1   SSM is spelled out as "state space sequence models" here and as "structured state space models" at 2312.00752.pdf p.1
+WARNING   2312.00752.pdf p.62  LTI is spelled out as "linear time-invariant" here and as "Linear Time Invariance" at 2312.00752.pdf p.3
+note      2312.00752.pdf p.2   "out-performs" (1×) here, "outperforms" (2×) elsewhere, first at 2312.00752.pdf p.1: one spelling throughout?
+note      2312.00752.pdf p.4   SSNN is used here before it is spelled out (2312.00752.pdf p.42)
+```
+
+On a PDF it checks what can be read from sentences: claimed changes ("from 27.3 to 28.9, a 9.5% gain"), abstract
+numbers that appear nowhere else in the text, and the consistency checks below. A PDF's tables lose their rows,
+columns and bold, so the table checks need the LaTeX source. Add `--lookup-references` to also check the reference
+list: that sends the references' titles and authors (other people's published work, not the submission) to
+OpenAlex and Crossref, and the report says so. The exit code is always 0.
+
 ## What it checks
 
 **The paper against itself** (offline: nothing is sent anywhere)
@@ -79,6 +111,15 @@ readers, and the kind a tool can rule out before submission.
 | **Text against tables** | a sentence that points to a table (`Table~\ref{tab:main}`) and quotes a number: the number is in that table, or a difference or relative change of two of its numbers. Reported only when a cell of the table is within 5% of it (a stale or mistyped result), with that cell |
 | **Labels** | `\ref`, `\cref`, `\autoref`... to labels that are never defined (they print as ??); labels defined twice (an error when something refers to them); figures and tables never referred to |
 | **Citations** | `\cite` keys with no bibliography entry (they print as [?]); entries nobody cites |
+
+**The paper as a whole** (offline; LaTeX and PDF)
+
+| | |
+|---|---|
+| **Acronyms** | one acronym spelled out two different ways (warning); spelled out again after its first definition; used before it is spelled out; spelled out only in the abstract or a caption. The abstract is read on its own and captions spell out on purpose, so neither counts as the first definition. Files are read in the order `\input` puts them in |
+| **One term, two spellings** | "pre-training" and "pretraining", "data set" and "dataset", with how often each is used. Not reported: "ground truth" and "ground-truth", which are noun and adjective |
+| **British and American** | "optimise" in a paper that otherwise writes "optimize", "modelling" next to "modeling" |
+| **Symbols** (LaTeX) | one symbol given two meanings: "Let $N$ be the number of layers" and later "Let $N$ be the batch size" |
 
 **Each cited reference** (online: title and identifiers go to the databases below)
 
@@ -114,6 +155,14 @@ Measured with the scripts in [`scripts/`](scripts/) on the 50 papers of [`script
   names, arXiv and Zenodo DOIs that Crossref does not hold, consortium authors. After the fixes: 4 mismatches, two of
   them real (LoRA cites Jihun Hamm as "Ham"; DPO lists the wrong first author for "Dueling RL"). Recorded answers of
   the databases drive the tests (no test reaches the network).
+- **Consistency.** On the 50 papers: 5 acronyms spelled out two ways (in 4 papers), all 5 real (one, LTI as
+  "linear time-invariant" and "Linear Time Invariance", is only a change of word form); 11 papers mixing British and
+  American spelling, all 11 real; terms written two ways, 161 notes in 45 papers, of which 28 of a sample of 30 are
+  real (the other two come from names such as "GPT-Neo" written once without its hyphen). The acronym notes
+  (spelled out again: 87; used before spelled out: 69; spelled out only in the abstract or a caption: 15) follow the
+  usual rule; whether to follow it is the author's call. The first version also counted "ground truth" against
+  "ground-truth" and LaTeX's closing quotes as part of an acronym's words; both fixed. The symbol check found nothing
+  in these papers (128 definitions, none given two meanings); it is tested on made-up text.
 - **PDFs.** Of the same papers' 372 references read from their PDFs, 323 titles come out exactly and 367 can be
   matched (the whole printed entry is matched when the title cannot be cut out).
 
@@ -142,9 +191,10 @@ or install it: `uv tool install git+https://github.com/zch6a/paper-proof` (or `p
 ```bash
 paper-proof paper/                 # a LaTeX project folder (the main .tex is found), all checks
 paper-proof paper/main.tex         # the main file
-paper-proof paper/ --offline       # numbers, labels and citations only: nothing is sent anywhere
+paper-proof paper/ --offline       # numbers, labels, citations and consistency: nothing is sent anywhere
 paper-proof 2106.09685             # any arXiv paper: its LaTeX source, in a temporary folder deleted afterwards
-paper-proof paper.pdf              # a PDF: its references (tables lose their bold in a PDF's text)
+paper-proof paper.pdf              # a PDF: its references, numbers in sentences, consistency (tables lose their bold)
+paper-proof submission.pdf --review  # for a reviewer: sends nothing, lists points to check with page numbers
 paper-proof refs.bib               # just a bibliography
 paper-proof paper/ --format json   # every finding with file and line, for scripts
 paper-proof paper/ --format md     # a Markdown table, for a pull request or a review
@@ -152,7 +202,8 @@ paper-proof paper/ --format md     # a Markdown table, for a pull request or a r
 
 | Option | |
 |---|---|
-| `--checks refs,numbers` | what to check (default both; `--offline` is `--checks numbers`) |
+| `--checks refs,numbers,consistency` | what to check (default all three; `--offline` is `--checks numbers,consistency`) |
+| `--review` | for a reviewer: no reference lookups (nothing is sent), points to check, exit code 0; `--lookup-references` adds the reference list (its titles and authors are sent) |
 | `--fail-on not-found` | exit 1 for: `not-found` (default: invented or retracted references, undefined citations and labels), `mismatch` (also wrong details and number warnings), `never` |
 | `--only KEY` | check only these bibliography keys (repeatable) |
 | `--jobs 4` | references checked at once; each database keeps its own pace |
@@ -180,7 +231,7 @@ jobs:
       - uses: zch6a/paper-proof@v0
         with:
           path: paper          # the LaTeX project folder
-          # checks: numbers    # offline only
+          # checks: numbers,consistency    # offline only
           # fail-on: mismatch  # stricter
 ```
 

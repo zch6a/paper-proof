@@ -106,3 +106,43 @@ for a tag object at the commit's sha; that request fails, gh prints the error bo
 that text in front of the sha, so v0 would not have moved. It now reads the ref's type and follows a tag object only
 for an annotated tag, and stops if what it got is not a sha (the same fix arxiv-diff had in its final review).
 Releases so far used annotated tags and were not affected.
+
+### 2026-11-14 — 0.2.0: whole-paper consistency, and a review mode
+
+Chosen from research-kit's list of needs nothing covers: checks across a whole paper (LanguageTool, Vale and
+TeXtidote read one sentence at a time), and help for reviewers that runs locally (review generators write whole
+reviews, which most venues forbid, and call hosted models).
+
+**Consistency** (`checks/consistency.py`): acronyms (two expansions, spelled out again, used before, only in the
+abstract or a caption), one term written two ways, British and American spelling mixed, a symbol given two meanings.
+Prose first: math, `\cite`/`\ref`/`\label`/URL arguments and command names blanked, line breaks kept. Reading order
+follows `\input`, so a definition in an included file counts where it is read.
+
+**Measured on the 50 arXiv sources** (fetched to a temporary folder, deleted after), every finding of the rarer kinds
+read and the frequent ones sampled:
+- first run: 7 "two expansions", 3 of them false (LaTeX's closing quotes '' counted as part of the last word); fixed:
+  5 left, all real (Mamba's SSM as "structured state space models" and "state space sequence models"; RoFormer's
+  RoPE as "Rotary Position Embedding" and "rotary position encoding"; InstructGPT's RM; BERT's MLM; Mamba's LTI, a
+  change of word form only);
+- "ground truth" against "ground-truth", "trade off" against "trade-off" were reported: noun and adjective, noun and
+  verb. Now only pairs where one form is closed up are reported; 28 of 30 sampled are then real;
+- British and American mixed: 11 papers, all real (CLIP, GPT-3, DINOv2, Llama 2, ...); "analyses" (a plural) and
+  "laboratory" (not "labor") are no longer evidence;
+- the matcher read "state space sequence models (SSMs)" from the S of "sequence"; the quoted expansion now takes the
+  word before with the same initial ("state"), and two expansions are the same when one ends with the other.
+- symbols: 128 definitions found, none with two meanings; tested on made-up text.
+
+**PDF**: the text with pages kept (form feeds), the reference list blanked (its heading was missed at the top of a
+page: fixed), the abstract found between "Abstract" and "Introduction". Claimed changes and abstract numbers are
+checked on it, with page numbers. On five arXiv PDFs (LoRA, Mamba, RoFormer, Tree of Thoughts, BERT) the same real
+acronym findings appear as from the sources. Two wrong turns fixed on the way: BERT's "7.7% point absolute
+improvement" was taken for a stale number (the clause after a number is now read), and then "41.2 accuracy, 3.1
+points over the baseline" hid 41.2 (only the number's own clause counts). "Low-Rank Adaptation, or LoRA" is now a
+definition (LoRA's paper writes it so).
+
+**`--review`**: nothing sent (no reference lookups unless `--lookup-references`), the report starts by saying what was
+sent and that each point is something to check, exit code 0. The Agent Skill says to use it for someone else's
+submission and never to write the review.
+
+16 tests (133 in all, on Python 3.10 too); README, Chinese README, Action input and Skill updated; the example paper
+has two consistency slips (an acronym spelled out only in the abstract, "pretrained" next to "pre-trained").

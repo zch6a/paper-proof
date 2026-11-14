@@ -57,6 +57,13 @@ class Extra:
     findings: list[Finding] = field(default_factory=list)  # the paper against itself (numbers, labels)
     refs_checked: bool = True
     texts: dict[str, str] = field(default_factory=dict, repr=False)  # the project's sources, never written to a report
+    pdf: bool = False  # findings' "line" is a page
+    abstract: dict[str, tuple[int, int]] = field(default_factory=dict, repr=False)  # a PDF's abstract (start, end)
+    review: str = ""  # review mode: what was sent (said in the report's first lines)
+
+
+def where(f: Finding, pdf: bool) -> str:
+    return f"{f.file} p.{f.line}" if pdf else f"{f.file}:{f.line}"
 
 
 def _where(v: Verdict) -> str:
@@ -71,6 +78,8 @@ def summary(verdicts: list[Verdict]) -> dict[str, int]:
 
 
 def _scope(extra: Extra, n: int) -> str:
+    if not extra.refs_checked and extra.pdf:
+        return "the PDF's text: consistency and numbers in sentences (references not looked up)"
     if not extra.refs_checked:
         return f"main file {extra.main}, numbers, labels and citations (references not looked up: offline)"
     if not extra.main:
@@ -82,6 +91,8 @@ def text(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str,
     extra = extra or Extra()
     paint = (lambda code, s: f"\x1b[{code}m{s}\x1b[0m") if color else (lambda code, s: s)
     out = [f"paper-proof {__version__} · {visible(source)}: {_scope(extra, len(verdicts))}", ""]
+    if extra.review:
+        out[-1:] = [extra.review, "Each point below is something to check, not a verdict on the paper.", ""]
     for key, file, line in extra.undefined:
         out.append(f"{paint('31;1', 'UNDEFINED')} \\cite{{{visible(key)}}} ({visible(file)}:{line}) has no bibliography entry: it prints as [?]")
     for name in extra.missing_files:
@@ -92,7 +103,9 @@ def text(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str,
         out.append("The paper against itself:")
         for f in extra.findings:
             if f.kind != "unreferenced":
-                out.append(f"{paint(FINDING_COLOR[f.severity], FINDING_LABEL[f.severity].ljust(9))} {visible(f.file)}:{f.line}  {visible(f.message)}")
+                out.append(
+                    f"{paint(FINDING_COLOR[f.severity], FINDING_LABEL[f.severity].ljust(9))} {visible(where(f, extra.pdf))}  {visible(f.message)}"
+                )
         unref = [f for f in extra.findings if f.kind == "unreferenced"]
         if unref:
             names = ", ".join(visible(f.message.split(" ")[1]) for f in unref[:10]) + (f" and {len(unref) - 10} more" if len(unref) > 10 else "")
@@ -127,7 +140,8 @@ def text(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: str,
     if extra.undefined:
         parts.insert(0, f"{len(extra.undefined)} UNDEFINED")
     fc = Counter(f.severity for f in extra.findings)
-    parts = [f"{fc[k]} {FINDING_LABEL[k]}{'S' if k != 'note' and fc[k] > 1 else ''}" for k in ("error", "warning", "note") if fc[k]] + parts
+    plural = {"error": "S", "warning": "S", "note": "s"}
+    parts = [f"{fc[k]} {FINDING_LABEL[k]}{plural[k] if fc[k] > 1 else ''}" for k in ("error", "warning", "note") if fc[k]] + parts
     out.append("Summary: " + (", ".join(parts) or "nothing to report") + (f", {len(dups)} duplicate(s)" if dups else ""))
     if s["unknown"]:
         out.append("Unknown means a database did not answer; run again later (answers are cached).")
@@ -189,7 +203,7 @@ def markdown(verdicts: list[Verdict], dups: list[tuple[str, str, str]], source: 
         out += [""] + [f"- {_code(chr(92) + 'cite{' + k + '}')} at {_code(f'{f}:{n}')} has no bibliography entry" for k, f, n in extra.undefined]
     if extra.findings:
         out += ["", "| | Where | The paper against itself |", "|---|---|---|"]
-        out += [f"| {FINDING_LABEL[f.severity]} | {_code(f'{f.file}:{f.line}')} | {_md(f.message)} |" for f in extra.findings]
+        out += [f"| {FINDING_LABEL[f.severity]} | {_code(where(f, extra.pdf))} | {_md(f.message)} |" for f in extra.findings]
     rows = [v for v in sorted(verdicts, key=lambda v: (ORDER.index(v.status), v.line)) if v.status not in ("ok", "skipped") or v.notes]
     if rows:
         out += ["", "| | Reference | What was found |", "|---|---|---|"]
